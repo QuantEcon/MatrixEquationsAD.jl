@@ -3,6 +3,7 @@ using MatrixEquationsAD
 using Test
 
 @testset "MatrixEquationsAD.jl" begin
+    include("readme_examples.jl")
     include("ordqz_fixtures.jl")
     include("test_ordqz.jl")
     include("test_enzyme_dlyap.jl")

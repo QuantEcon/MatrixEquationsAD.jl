@@ -23,8 +23,50 @@ using MatrixEquationsAD
 A = [0.55 0.08; -0.04 0.42]
 C = [1.0 0.2; 0.2 0.7]
 
-f(a) = sum(lyapd(reshape(a, 2, 2), C))
-ForwardDiff.gradient(f, vec(A))
+function lyapd_sum(x)
+    nA = length(A)
+    A_dual = reshape(x[1:nA], size(A))
+    C_dual = reshape(x[(nA + 1):end], size(C))
+    return sum(lyapd(A_dual, C_dual))
+end
+
+ForwardDiff.gradient(lyapd_sum, [vec(A); vec(C)])
+```
+
+Reverse-mode differentiate a small generalized Sylvester solve:
+
+```julia
+using MatrixEquations
+using Enzyme: Active, Const, Duplicated, Reverse, autodiff
+using LinearAlgebra: I, dot
+using MatrixEquationsAD
+
+A = Matrix([4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8])
+B = Matrix([3.0 0.2; -0.1 2.7])
+C = Matrix(0.2I, 3, 3)
+D = Matrix(0.3I, 2, 2)
+E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
+W = [0.7 -0.1; -0.2 0.4; 0.5 0.3]
+
+function gsylv_weighted_sum(A, B, C, D, E, W)::Float64
+    return dot(W, gsylv(A, B, C, D, E))
+end
+
+dA = zeros(size(A))
+dB = zeros(size(B))
+dC = zeros(size(C))
+dD = zeros(size(D))
+dE = zeros(size(E))
+
+autodiff(
+    Reverse, gsylv_weighted_sum, Active,
+    Duplicated(copy(A), dA),
+    Duplicated(copy(B), dB),
+    Duplicated(copy(C), dC),
+    Duplicated(copy(D), dD),
+    Duplicated(copy(E), dE),
+    Const(W),
+)
 ```
 
 Use the exported ordered-QZ wrapper:
