@@ -126,7 +126,7 @@ end
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
-        func::Const{typeof(MatrixEquationsAD.ordqz!)},
+        func::Const{typeof(ordqz!)},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -140,62 +140,51 @@ function EnzymeRules.forward(
 
     if EnzymeRules.needs_shadow(config)
         N = EnzymeRules.width(config)
-        dSs = if typeof(S) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(S) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            S.dval
-        else
-            ntuple(Returns(S.dval), Val(N))
-        end
-        dTs = if typeof(Targ) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(Targ) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            Targ.dval
-        else
-            ntuple(Returns(Targ.dval), Val(N))
-        end
-        dQs = if typeof(Q) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(Q) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            Q.dval
-        else
-            ntuple(Returns(Q.dval), Val(N))
-        end
-        dZs = if typeof(Z) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(Z) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            Z.dval
-        else
-            ntuple(Returns(Z.dval), Val(N))
-        end
-        dAs = if typeof(A) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(A) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            A.dval
-        else
-            ntuple(Returns(A.dval), Val(N))
-        end
-        dBs = if typeof(B) <: Const
-            ntuple(Returns(nothing), Val(N))
-        elseif typeof(B) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-            B.dval
-        else
-            ntuple(Returns(B.dval), Val(N))
-        end
-
         for i in 1:N
             dA = if typeof(A) <: Const
                 zero(A.val)
+            elseif N == 1
+                A.dval
             else
-                dAs[i]
+                A.dval[i]
             end
             dB = if typeof(B) <: Const
                 zero(B.val)
+            elseif N == 1
+                B.dval
             else
-                dBs[i]
+                B.dval[i]
+            end
+            dS = if typeof(S) <: Const
+                zero(S.val)
+            elseif N == 1
+                S.dval
+            else
+                S.dval[i]
+            end
+            dT = if typeof(Targ) <: Const
+                zero(Targ.val)
+            elseif N == 1
+                Targ.dval
+            else
+                Targ.dval[i]
+            end
+            dQ = if typeof(Q) <: Const
+                zero(Q.val)
+            elseif N == 1
+                Q.dval
+            else
+                Q.dval[i]
+            end
+            dZ = if typeof(Z) <: Const
+                zero(Z.val)
+            elseif N == 1
+                Z.dval
+            else
+                Z.dval[i]
             end
             ordqz_tangent!(
-                dSs[i], dTs[i], dQs[i], dZs[i],
+                dS, dT, dQ, dZ,
                 S.val, Targ.val, Q.val, Z.val,
                 dA, dB,
             )
@@ -211,7 +200,7 @@ end
 
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(MatrixEquationsAD.ordqz!)},
+        func::Const{typeof(ordqz!)},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -229,7 +218,7 @@ end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(MatrixEquationsAD.ordqz!)},
+        func::Const{typeof(ordqz!)},
         ::Type{<:Const},
         tape,
         S::Annotation{<:StridedMatrix{T}},
@@ -242,64 +231,54 @@ function EnzymeRules.reverse(
     ) where {T <: Union{Float32, Float64}}
     Sv, Tv, Qv, Zv = tape
     N = EnzymeRules.width(config)
-    dSs = if typeof(S) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(S) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        S.dval
-    else
-        ntuple(Returns(S.dval), Val(N))
-    end
-    dTs = if typeof(Targ) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(Targ) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        Targ.dval
-    else
-        ntuple(Returns(Targ.dval), Val(N))
-    end
-    dQs = if typeof(Q) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(Q) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        Q.dval
-    else
-        ntuple(Returns(Q.dval), Val(N))
-    end
-    dZs = if typeof(Z) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(Z) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        Z.dval
-    else
-        ntuple(Returns(Z.dval), Val(N))
-    end
-    dAs = if typeof(A) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(A) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        A.dval
-    else
-        ntuple(Returns(A.dval), Val(N))
-    end
-    dBs = if typeof(B) <: Const
-        ntuple(Returns(nothing), Val(N))
-    elseif typeof(B) <: Union{BatchDuplicated, BatchDuplicatedNoNeed}
-        B.dval
-    else
-        ntuple(Returns(B.dval), Val(N))
-    end
 
     for i in 1:N
         dA = if typeof(A) <: Const
             zero(A.val)
+        elseif N == 1
+            A.dval
         else
-            dAs[i]
+            A.dval[i]
         end
         dB = if typeof(B) <: Const
             zero(B.val)
+        elseif N == 1
+            B.dval
         else
-            dBs[i]
+            B.dval[i]
+        end
+        dS = if typeof(S) <: Const
+            zero(S.val)
+        elseif N == 1
+            S.dval
+        else
+            S.dval[i]
+        end
+        dT = if typeof(Targ) <: Const
+            zero(Targ.val)
+        elseif N == 1
+            Targ.dval
+        else
+            Targ.dval[i]
+        end
+        dQ = if typeof(Q) <: Const
+            zero(Q.val)
+        elseif N == 1
+            Q.dval
+        else
+            Q.dval[i]
+        end
+        dZ = if typeof(Z) <: Const
+            zero(Z.val)
+        elseif N == 1
+            Z.dval
+        else
+            Z.dval[i]
         end
         ordqz_adjoint!(
             dA, dB,
             Sv, Tv, Qv, Zv,
-            dSs[i], dTs[i], dQs[i], dZs[i],
+            dS, dT, dQ, dZ,
         )
     end
 

@@ -1,13 +1,13 @@
 module MatrixEquationsADForwardDiffExt
 
 using ConcreteStructs: @concrete
-using ForwardDiff
+using ForwardDiff: Dual, Partials, partials, value
 using MatrixEquations
 using MatrixEquationsAD
 using LinearAlgebra: LinearAlgebra, StridedMatrix, Symmetric, mul!, schur
 
-const FDDual{T, V, N} = ForwardDiff.Dual{T, V, N}
-const FDDualMatrix{T, V, N} = StridedMatrix{<:FDDual{T, V, N}}
+import MatrixEquations: gsylv, gsylvkr, lyapd
+import MatrixEquationsAD: ordqz!
 
 include("forwarddiff_lyapunov.jl")
 include("forwarddiff_sylvester.jl")

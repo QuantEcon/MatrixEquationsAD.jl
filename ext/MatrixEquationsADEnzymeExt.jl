@@ -4,6 +4,8 @@ using MatrixEquations
 using MatrixEquationsAD
 
 import Enzyme.EnzymeRules
+import MatrixEquations: gsylv, gsylvkr, lyapd
+import MatrixEquationsAD: ordqz!
 using ConcreteStructs: @concrete
 using Enzyme:
     Annotation, BatchDuplicated, BatchDuplicatedNoNeed, Const,
