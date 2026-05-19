@@ -1,9 +1,12 @@
 module MatrixEquationsAD
 
-using LinearAlgebra: GeneralizedSchur, ordschur!, schur
+using ConcreteStructs: @concrete
+using LinearAlgebra:
+    GeneralizedSchur, LU, checksquare, issuccess, ldiv!, lu!, ordschur!, schur
 
-export ordqz, ordqz!
+export lyapdkr, ordqz, ordqz!
 
+include("lyapdkr.jl")
 include("ordqz.jl")
 
 end

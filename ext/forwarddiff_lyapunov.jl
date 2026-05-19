@@ -29,13 +29,18 @@ function lyapd(
     Cval = map(value, C)
     cache = lyapdfactor(Aval)
     X = lyapdsolve(cache, Cval)
+    sym = LinearAlgebra.issymmetric(Cval)
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta
-        rhs = map(x -> partials(x, i), C)
+        dC = map(x -> partials(x, i), C)
+        rhs = copy(dC)
         dA = map(x -> partials(x, i), A)
         rhs .+= dA * X * Aval'
         rhs .+= Aval * X * dA'
+        if sym && LinearAlgebra.issymmetric(dC)
+            _symmetrize_square!(rhs, size(rhs, 1))
+        end
         lyapdsolve(cache, rhs)
     end
 

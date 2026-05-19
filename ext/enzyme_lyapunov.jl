@@ -48,6 +48,7 @@ function EnzymeRules.forward(
     N = EnzymeRules.width(config)
     cache = lyapdfactor(A.val)
     retval = lyapdsolve(cache, C.val)
+    sym = LinearAlgebra.issymmetric(C.val)
 
     dretvals = ntuple(Val(N)) do i
         Base.@_inline_meta
@@ -58,10 +59,20 @@ function EnzymeRules.forward(
         else
             copy(C.dval[i])
         end
+        C_tangent_symmetric = if typeof(C) <: Const
+            true
+        elseif N == 1
+            LinearAlgebra.issymmetric(C.dval)
+        else
+            LinearAlgebra.issymmetric(C.dval[i])
+        end
         if !(typeof(A) <: Const)
             dA = N == 1 ? A.dval : A.dval[i]
             rhs .+= dA * retval * A.val'
             rhs .+= A.val * retval * dA'
+        end
+        if sym && C_tangent_symmetric
+            _symmetrize_square!(rhs, size(rhs, 1))
         end
         lyapdsolve(cache, rhs)
     end
@@ -87,11 +98,12 @@ function EnzymeRules.augmented_primal(
     ) where {RT, T <: Union{Float32, Float64}}
     cache = lyapdfactor(A.val)
     X = lyapdsolve(cache, C.val)
+    sym = LinearAlgebra.issymmetric(C.val)
     dXs = EnzymeRules.width(config) == 1 ? zero(X) :
         ntuple(_ -> zero(X), Val(EnzymeRules.width(config)))
 
     primal = EnzymeRules.needs_primal(config) ? X : nothing
-    tape = (copy(X), dXs, cache, copy(A.val))
+    tape = (copy(X), dXs, cache, copy(A.val), sym)
     return EnzymeRules.AugmentedReturn(
         primal::EnzymeRules.primal_type(config, RT),
         dXs, tape
@@ -106,10 +118,13 @@ function EnzymeRules.reverse(
         A::Annotation{<:StridedMatrix{T}},
         C::Annotation{<:StridedMatrix{T}}
     ) where {RT, T <: Union{Float32, Float64}}
-    X, dXs, cache, Aval = tape
+    X, dXs, cache, Aval, sym = tape
     N = EnzymeRules.width(config)
     for i in 1:N
         Xbar = N == 1 ? dXs : dXs[i]
+        if sym && LinearAlgebra.issymmetric(Xbar)
+            _symmetrize_square!(Xbar, size(Xbar, 1))
+        end
         Y = lyapdadjointsolve(cache, Xbar)
 
         if !(typeof(C) <: Const)

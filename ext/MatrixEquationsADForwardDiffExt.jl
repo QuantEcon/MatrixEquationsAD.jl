@@ -7,9 +7,12 @@ using MatrixEquationsAD
 using LinearAlgebra: LinearAlgebra, StridedMatrix, Symmetric, mul!, schur
 
 import MatrixEquations: gsylv, gsylvkr, lyapd
-import MatrixEquationsAD: _ordqz!
+import MatrixEquationsAD:
+    _lyapdkr_check!, _ordqz!, _symmetrize_square!, lyapdkr, lyapdkrfactor,
+    lyapdkrsolve
 
 include("forwarddiff_lyapunov.jl")
+include("forwarddiff_lyapdkr.jl")
 include("forwarddiff_sylvester.jl")
 include("ordqz_derivatives.jl")
 include("forwarddiff_ordqz.jl")
