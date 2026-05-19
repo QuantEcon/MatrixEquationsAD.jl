@@ -34,6 +34,34 @@ function lyapd_symmetric_factor_weighted_sum(A, C_factor, W)::Float64
     return dot(W, X)
 end
 
+function lyapd_enzyme_forward_ad(A, C, dA, dC)
+    return autodiff(
+        Forward, lyapd, Duplicated,
+        Duplicated(A, dA), Duplicated(C, dC)
+    )
+end
+
+function lyapd_symmetric_enzyme_forward_ad(A, C, dA, dC)
+    return autodiff(
+        Forward, lyapd_symmetric, Duplicated,
+        Duplicated(A, dA), Duplicated(C, dC)
+    )
+end
+
+function lyapd_enzyme_reverse_ad(A, C, dA, dC, W)
+    return autodiff(
+        Reverse, lyapd_weighted_sum, Active,
+        Duplicated(A, dA), Duplicated(C, dC), Const(W)
+    )
+end
+
+function lyapd_symmetric_enzyme_reverse_ad(A, C, dA, dC, W)
+    return autodiff(
+        Reverse, lyapd_symmetric_weighted_sum, Active,
+        Duplicated(A, dA), Duplicated(C, dC), Const(W)
+    )
+end
+
 # using BenchmarkTools
 # function bench_lyapd_enzyme()
 #     A, C = lyapd_enzyme_problem()
@@ -69,6 +97,24 @@ end
     dC0 = 0.1 .* randn(size(C))
     dC_dir = 0.5 .* (dC0 + dC0')
     fdm = central_fdm(5, 1)
+    ForwardADReturn = NamedTuple{(Symbol("1"),), Tuple{Matrix{Float64}}}
+    ReverseADReturn = Tuple{Tuple{Nothing, Nothing, Nothing}}
+    @test (@inferred lyapd_enzyme_forward_ad(A, C, dA_dir, dC_dir)) isa
+        ForwardADReturn
+    @test (@inferred lyapd_symmetric_enzyme_forward_ad(A, C, dA_dir, dC_dir)) isa
+        ForwardADReturn
+    dA_inferred = zero(A)
+    dC_inferred = zero(C)
+    @test (@inferred lyapd_enzyme_reverse_ad(A, C, dA_inferred, dC_inferred, W)) isa
+        ReverseADReturn
+    fill!(dA_inferred, 0)
+    fill!(dC_inferred, 0)
+    @test (
+        @inferred lyapd_symmetric_enzyme_reverse_ad(
+            A, C, dA_inferred, dC_inferred, W
+        )
+    ) isa ReverseADReturn
+
     dfd = jvp(
         fdm, (A_, C_) -> lyapd_weighted_sum(A_, C_, W),
         (A, dA_dir), (C, dC_dir)
