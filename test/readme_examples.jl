@@ -1,11 +1,11 @@
-using Enzyme: Active, Const, Duplicated, Reverse, autodiff
+using Enzyme: Active, Const, Duplicated, Reverse, autodiff, make_zero
 using ForwardDiff
-using LinearAlgebra: I, dot
+using LinearAlgebra: dot
 using MatrixEquations
 using MatrixEquationsAD
 using Test
 
-function readme_gsylv_weighted_sum(A, B, C, D, E, W)::Float64
+function readme_gsylv_weighted_sum(A, B, C, D, E, W)
     return dot(W, gsylv(A, B, C, D, E))
 end
 
@@ -28,26 +28,26 @@ end
     end
 
     @testset "Enzyme reverse gsylv" begin
-        A = Matrix([4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8])
-        B = Matrix([3.0 0.2; -0.1 2.7])
-        C = Matrix(0.2I, 3, 3)
-        D = Matrix(0.3I, 2, 2)
+        A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
+        B = [3.0 0.2; -0.1 2.7]
+        C = [0.2 0.0 0.0; 0.0 0.2 0.0; 0.0 0.0 0.2]
+        D = [0.3 0.0; 0.0 0.3]
         E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
         W = [0.7 -0.1; -0.2 0.4; 0.5 0.3]
 
-        dA = zeros(size(A))
-        dB = zeros(size(B))
-        dC = zeros(size(C))
-        dD = zeros(size(D))
-        dE = zeros(size(E))
+        dA = make_zero(A)
+        dB = make_zero(B)
+        dC = make_zero(C)
+        dD = make_zero(D)
+        dE = make_zero(E)
 
         autodiff(
             Reverse, readme_gsylv_weighted_sum, Active,
-            Duplicated(copy(A), dA),
-            Duplicated(copy(B), dB),
-            Duplicated(copy(C), dC),
-            Duplicated(copy(D), dD),
-            Duplicated(copy(E), dE),
+            Duplicated(A, dA),
+            Duplicated(B, dB),
+            Duplicated(C, dC),
+            Duplicated(D, dD),
+            Duplicated(E, dE),
             Const(W),
         )
 
