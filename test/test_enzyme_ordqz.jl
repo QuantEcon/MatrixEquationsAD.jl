@@ -14,8 +14,8 @@ function ordqz_enzyme_problem()
 end
 
 function ordqz_enzyme_sum!(S, T, Q, Z, A, B)::Float64
-    sdim = ordqz!(S, T, Q, Z, A, B, qzselect_inside_unit)
-    scale = sdim == 1 ? 1.0 : -1.0
+    sdim = ordqz!(S, T, Q, Z, A, B, :bk; threshold = 1.0e-6)
+    scale = sdim == 2 ? 1.0 : -1.0
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 
@@ -24,8 +24,8 @@ function ordqz_reverse_reconstruction_sum(A, B)::Float64
     T = zero(B)
     Q = zero(A)
     Z = zero(A)
-    sdim = ordqz!(S, T, Q, Z, A, B, qzselect_inside_unit)
-    scale = sdim == 1 ? 1.0 : -1.0
+    sdim = ordqz!(S, T, Q, Z, A, B, :bk; threshold = 1.0e-6)
+    scale = sdim == 2 ? 1.0 : -1.0
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 

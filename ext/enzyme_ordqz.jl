@@ -126,7 +126,7 @@ end
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
-        func::Const{typeof(ordqz!)},
+        func::Const{typeof(_ordqz!)},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -134,9 +134,12 @@ function EnzymeRules.forward(
         Z::Annotation{<:StridedMatrix{T}},
         A::Annotation{<:StridedMatrix{T}},
         B::Annotation{<:StridedMatrix{T}},
-        select::Const
+        ordering::Const,
+        threshold::Const
     ) where {T <: Union{Float32, Float64}}
-    sdim = func.val(S.val, Targ.val, Q.val, Z.val, A.val, B.val, select.val)
+    sdim = func.val(
+        S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
+    )
 
     if EnzymeRules.needs_shadow(config)
         N = EnzymeRules.width(config)
@@ -200,7 +203,7 @@ end
 
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(ordqz!)},
+        func::Const{typeof(_ordqz!)},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -208,9 +211,12 @@ function EnzymeRules.augmented_primal(
         Z::Annotation{<:StridedMatrix{T}},
         A::Annotation{<:StridedMatrix{T}},
         B::Annotation{<:StridedMatrix{T}},
-        select::Const
+        ordering::Const,
+        threshold::Const
     ) where {T <: Union{Float32, Float64}}
-    sdim = func.val(S.val, Targ.val, Q.val, Z.val, A.val, B.val, select.val)
+    sdim = func.val(
+        S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
+    )
     tape = (copy(S.val), copy(Targ.val), copy(Q.val), copy(Z.val))
     primal = EnzymeRules.needs_primal(config) ? sdim : nothing
     return EnzymeRules.AugmentedReturn(primal, nothing, tape)
@@ -218,7 +224,7 @@ end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(ordqz!)},
+        func::Const{typeof(_ordqz!)},
         ::Type{<:Const},
         tape,
         S::Annotation{<:StridedMatrix{T}},
@@ -227,7 +233,8 @@ function EnzymeRules.reverse(
         Z::Annotation{<:StridedMatrix{T}},
         A::Annotation{<:StridedMatrix{T}},
         B::Annotation{<:StridedMatrix{T}},
-        select::Const
+        ordering::Const,
+        threshold::Const
     ) where {T <: Union{Float32, Float64}}
     Sv, Tv, Qv, Zv = tape
     N = EnzymeRules.width(config)
@@ -282,5 +289,5 @@ function EnzymeRules.reverse(
         )
     end
 
-    return (nothing, nothing, nothing, nothing, nothing, nothing, nothing)
+    return (nothing, nothing, nothing, nothing, nothing, nothing, nothing, nothing)
 end

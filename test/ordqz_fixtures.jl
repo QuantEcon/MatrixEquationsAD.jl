@@ -1,4 +1,4 @@
-dp_ordqz_select(alpha, beta) = abs2(alpha) > (1 - 1.0e-6)^2 * abs2(beta)
+const dp_ordqz_threshold = 1.0e-6
 
 function dp_rbc_ordqz_problem()
     A = [

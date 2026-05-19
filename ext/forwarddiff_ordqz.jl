@@ -1,7 +1,8 @@
-function ordqz!(
+function _ordqz!(
         S::StridedMatrix{<:Dual{T, V, N}}, Targ::StridedMatrix{<:Dual{T, V, N}},
         Q::StridedMatrix{<:Dual{T, V, N}}, Z::StridedMatrix{<:Dual{T, V, N}},
-        A::StridedMatrix{<:Dual{T, V, N}}, B::StridedMatrix{<:Dual{T, V, N}}, select
+        A::StridedMatrix{<:Dual{T, V, N}}, B::StridedMatrix{<:Dual{T, V, N}},
+        ordering::Symbol, threshold
     ) where {T, V <: Union{Float32, Float64}, N}
     Aval = map(value, A)
     Bval = map(value, B)
@@ -10,7 +11,7 @@ function ordqz!(
     Qval = Matrix{V}(undef, size(Q))
     Zval = Matrix{V}(undef, size(Z))
 
-    sdim = ordqz!(Sval, Tval, Qval, Zval, Aval, Bval, select)
+    sdim = _ordqz!(Sval, Tval, Qval, Zval, Aval, Bval, ordering, threshold)
 
     tangents = ntuple(Val(N)) do i
         Base.@_inline_meta

@@ -13,25 +13,25 @@ function ordqz_forwarddiff_problem()
     return A, B
 end
 
-function ordqz_forwarddiff_sum(A, B, select, expected)::eltype(A)
+function ordqz_forwarddiff_sum(A, B, ordering, expected; threshold = 1.0e-6)::eltype(A)
     S = zero(A)
     T = zero(B)
     Q = zero(A)
     Z = zero(A)
-    sdim = ordqz!(S, T, Q, Z, A, B, select)
+    sdim = ordqz!(S, T, Q, Z, A, B, ordering; threshold)
     scale = sdim == expected ? one(eltype(A)) : -one(eltype(A))
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 
-function ordqz_forwarddiff_directional(A, B, dA, dB, select, expected)
+function ordqz_forwarddiff_directional(A, B, dA, dB, ordering, expected; threshold = 1.0e-6)
     gA = grad(
         ordqz_forwarddiff_fdm,
-        x -> ordqz_forwarddiff_sum(reshape(x, size(A)), B, select, expected),
+        x -> ordqz_forwarddiff_sum(reshape(x, size(A)), B, ordering, expected; threshold),
         vec(A)
     )[1]
     gB = grad(
         ordqz_forwarddiff_fdm,
-        x -> ordqz_forwarddiff_sum(A, reshape(x, size(B)), select, expected),
+        x -> ordqz_forwarddiff_sum(A, reshape(x, size(B)), ordering, expected; threshold),
         vec(B)
     )[1]
     return dot(gA, vec(dA)) + dot(gB, vec(dB))
@@ -51,13 +51,13 @@ end
     end
 
     y = ordqz_forwarddiff_sum(
-        A_dual, B_dual, qzselect_inside_unit, 1
+        A_dual, B_dual, :bk, 2; threshold = 1.0e-6
     )
 
-    @test ForwardDiff.value(y) ≈ ordqz_forwarddiff_sum(A, B, qzselect_inside_unit, 1)
+    @test ForwardDiff.value(y) ≈ ordqz_forwarddiff_sum(A, B, :bk, 2; threshold = 1.0e-6)
     for i in 1:N
         @test ForwardDiff.partials(y, i) ≈
-            ordqz_forwarddiff_directional(A, B, dAs[i], dBs[i], qzselect_inside_unit, 1)
+            ordqz_forwarddiff_directional(A, B, dAs[i], dBs[i], :bk, 2)
     end
 
     A_dp, B_dp, expected = dp_rbc_ordqz_problem()
@@ -71,6 +71,6 @@ end
     end
     @test ordqz!(
         zero(A_dp_dual), zero(B_dp_dual), zero(A_dp_dual), zero(A_dp_dual),
-        A_dp_dual, B_dp_dual, dp_ordqz_select
+        A_dp_dual, B_dp_dual, :bk; threshold = dp_ordqz_threshold
     ) == expected
 end

@@ -1,35 +1,50 @@
-qzselect_right_half_plane(alpha, beta) = real(alpha / beta) > 0
-qzselect_left_half_plane(alpha, beta) = real(alpha / beta) < 0
-qzselect_outside_unit(alpha, beta) = abs(alpha) > abs(beta)
-qzselect_inside_unit(alpha, beta) = abs(alpha) < abs(beta)
+const DEFAULT_BK_THRESHOLD = 1.0e-6
 
-function qzselection(F::GeneralizedSchur, select)
+function qzselection(F::GeneralizedSchur, ordering::Symbol, threshold)
+    threshold >= zero(threshold) ||
+        throw(ArgumentError("threshold must be nonnegative"))
+    return qzselection(F, Val(ordering), threshold)
+end
+
+function qzselection(F::GeneralizedSchur, ::Val{:bk}, threshold)
     n = length(F.α)
     selection = Vector{Bool}(undef, n)
+    scale2 = (1 - threshold)^2
     @inbounds for i in 1:n
-        selection[i] = select(F.α[i], F.β[i])
+        selection[i] = abs2(F.α[i]) >= scale2 * abs2(F.β[i])
     end
     return selection
 end
 
-function qzselection(F::GeneralizedSchur, select::AbstractVector{Bool})
-    length(select) == length(F.α) ||
-        throw(DimensionMismatch("selection vector length must match pencil dimension"))
-    return collect(select)
+function qzselection(::GeneralizedSchur, ::Val{ordering}, threshold) where {ordering}
+    throw(ArgumentError("unsupported QZ ordering :$ordering; only :bk is supported"))
 end
 
-function ordqz(A::AbstractMatrix, B::AbstractMatrix, select)
+function ordqz(
+        A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol = :bk;
+        threshold = DEFAULT_BK_THRESHOLD
+    )
     F = schur(A, B)
-    ordschur!(F, qzselection(F, select))
-    return F
+    selection = qzselection(F, ordering, threshold)
+    sdim = count(selection)
+    ordschur!(F, selection)
+    return F, sdim
 end
 
 function ordqz!(
         S::AbstractMatrix, T::AbstractMatrix, Q::AbstractMatrix, Z::AbstractMatrix,
-        A::AbstractMatrix, B::AbstractMatrix, select
+        A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol = :bk;
+        threshold = DEFAULT_BK_THRESHOLD
+    )
+    return _ordqz!(S, T, Q, Z, A, B, ordering, threshold)
+end
+
+function _ordqz!(
+        S::AbstractMatrix, T::AbstractMatrix, Q::AbstractMatrix, Z::AbstractMatrix,
+        A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol, threshold
     )
     F = schur(A, B)
-    selection = qzselection(F, select)
+    selection = qzselection(F, ordering, threshold)
     sdim = count(selection)
     ordschur!(F, selection)
     copyto!(S, F.S)
