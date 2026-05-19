@@ -58,17 +58,21 @@ end
         @test any(!iszero, dE)
     end
 
-    @testset "ordqz wrapper" begin
+    @testset "gges wrapper" begin
         A = [1.6 0.2 0.1; 0.0 0.35 -0.1; 0.0 0.0 1.9]
         B = [1.0 0.1 0.0; 0.0 1.2 0.2; 0.0 0.0 0.8]
 
+        eps_BK = 1.0e-6
         n_unstable_expected = 2
-        F, n_unstable = ordqz(A, B, :bk; threshold = 1.0e-6)
-        n_unstable == n_unstable_expected ||
+        (; S, T, Q, Z, n_explosive) = gges(
+            A, B;
+            select = :ed, criterium = (1 - eps_BK)^2
+        )
+        n_explosive == n_unstable_expected ||
             error("Blanchard-Kahn condition failed")
 
-        @test n_unstable == 2
-        @test A ≈ F.Q * F.S * F.Z'
-        @test B ≈ F.Q * F.T * F.Z'
+        @test n_explosive == 2
+        @test A ≈ Q * S * Z'
+        @test B ≈ Q * T * Z'
     end
 end

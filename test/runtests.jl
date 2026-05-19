@@ -8,6 +8,7 @@ using Test
     include("riccati_fixtures.jl")
     include("test_lyapdkr.jl")
     include("test_ordqz.jl")
+    include("test_gges.jl")
     include("test_enzyme_dlyap.jl")
     include("test_enzyme_lyapdkr.jl")
     include("test_enzyme_riccati.jl")

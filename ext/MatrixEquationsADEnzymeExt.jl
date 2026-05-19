@@ -6,7 +6,7 @@ using MatrixEquationsAD
 import Enzyme.EnzymeRules
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
-    _lyapdkr_check!, _ordqz!, _symmetrize_square!, lyapdkr,
+    _gges!, _gges_ordschur!, _lyapdkr_check!, _ordqz!, _symmetrize_square!, lyapdkr,
     lyapdkradjointsolve, lyapdkrfactor, lyapdkrsolve
 using ConcreteStructs: @concrete
 using Enzyme:

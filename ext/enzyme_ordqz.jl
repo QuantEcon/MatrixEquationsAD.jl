@@ -124,9 +124,23 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
     return nothing
 end
 
+function ordered_qz_rule_primal!(
+        func::Const{typeof(_ordqz!)},
+        S, Targ, Q, Z, A, B, ordering, threshold
+    )
+    return func.val(S, Targ, Q, Z, A, B, ordering, threshold)
+end
+
+function ordered_qz_rule_primal!(
+        ::Const{typeof(_gges!)},
+        S, Targ, Q, Z, A, B, ordering, threshold
+    )
+    return _gges_ordschur!(S, Targ, Q, Z, A, B, ordering, threshold)
+end
+
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
-        func::Const{typeof(_ordqz!)},
+        func::Const{F},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -136,8 +150,9 @@ function EnzymeRules.forward(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {T <: Union{Float32, Float64}}
-    sdim = func.val(
+    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
+    primal = ordered_qz_rule_primal!(
+        func,
         S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
     )
 
@@ -195,7 +210,7 @@ function EnzymeRules.forward(
     end
 
     if EnzymeRules.needs_primal(config)
-        return sdim
+        return primal
     else
         return nothing
     end
@@ -203,7 +218,7 @@ end
 
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(_ordqz!)},
+        func::Const{F},
         ::Type{<:Const},
         S::Annotation{<:StridedMatrix{T}},
         Targ::Annotation{<:StridedMatrix{T}},
@@ -213,18 +228,19 @@ function EnzymeRules.augmented_primal(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {T <: Union{Float32, Float64}}
-    sdim = func.val(
+    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
+    primal = ordered_qz_rule_primal!(
+        func,
         S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
     )
     tape = (copy(S.val), copy(Targ.val), copy(Q.val), copy(Z.val))
-    primal = EnzymeRules.needs_primal(config) ? sdim : nothing
-    return EnzymeRules.AugmentedReturn(primal, nothing, tape)
+    returned = EnzymeRules.needs_primal(config) ? primal : nothing
+    return EnzymeRules.AugmentedReturn(returned, nothing, tape)
 end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(_ordqz!)},
+        func::Const{F},
         ::Type{<:Const},
         tape,
         S::Annotation{<:StridedMatrix{T}},
@@ -235,7 +251,7 @@ function EnzymeRules.reverse(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {T <: Union{Float32, Float64}}
+    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
     Sv, Tv, Qv, Zv = tape
     N = EnzymeRules.width(config)
 
