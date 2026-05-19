@@ -1,6 +1,6 @@
 using Enzyme: BatchDuplicated, Duplicated, Forward, autodiff
 using ForwardDiff
-using LinearAlgebra: issymmetric
+using LinearAlgebra: Symmetric, issymmetric
 using MatrixEquations
 using Random
 using Test
@@ -55,5 +55,43 @@ using Test
         dX = map(x -> ForwardDiff.partials(x, i), X_sym)
         @test dX ≈ dX'
         @test dX ≈ dXs_sym[i]
+    end
+
+    dual_C_wrapper = Symmetric(dual_C_sym)
+    X_wrapper = lyapd(dual_A_sym, dual_C_wrapper)
+    result_wrapper = autodiff(
+        Forward, (A_, C_) -> lyapd(A_, Symmetric(C_)), Duplicated,
+        BatchDuplicated(A, dAs_sym), BatchDuplicated(C, dCs_sym)
+    )
+    dXs_wrapper = ntuple(i -> result_wrapper[1][i], Val(N))
+
+    @test map(ForwardDiff.value, X_wrapper) ≈ lyapd(A, Symmetric(C))
+    for i in 1:N
+        dX = map(x -> ForwardDiff.partials(x, i), X_wrapper)
+        @test dX ≈ dX'
+        @test dX ≈ dXs_wrapper[i]
+    end
+
+    A_wrapper = [0.45 0.08; 0.08 0.35]
+    dAs_wrapper = ntuple(Val(N)) do _
+        M = 0.1 .* randn(size(A_wrapper))
+        0.5 .* (M + M')
+    end
+    dual_A_wrapper = map(A_wrapper, dAs_wrapper...) do a, ds...
+        ForwardDiff.Dual{Nothing}(a, ds...)
+    end
+    X_both_wrappers = lyapd(Symmetric(dual_A_wrapper), Symmetric(dual_C_sym))
+    result_both_wrappers = autodiff(
+        Forward, (A_, C_) -> lyapd(Symmetric(A_), Symmetric(C_)), Duplicated,
+        BatchDuplicated(A_wrapper, dAs_wrapper), BatchDuplicated(C, dCs_sym)
+    )
+    dXs_both_wrappers = ntuple(i -> result_both_wrappers[1][i], Val(N))
+
+    @test map(ForwardDiff.value, X_both_wrappers) ≈
+        lyapd(Symmetric(A_wrapper), Symmetric(C))
+    for i in 1:N
+        dX = map(x -> ForwardDiff.partials(x, i), X_both_wrappers)
+        @test dX ≈ dX'
+        @test dX ≈ dXs_both_wrappers[i]
     end
 end

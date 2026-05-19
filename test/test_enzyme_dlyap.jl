@@ -1,9 +1,9 @@
 using Enzyme:
     Active, BatchDuplicated, BatchDuplicatedNoNeed, Const, Duplicated,
-    DuplicatedNoNeed, Reverse, autodiff
+    DuplicatedNoNeed, Forward, Reverse, autodiff
 using EnzymeTestUtils: test_forward, test_reverse
 using FiniteDifferences: central_fdm, jvp
-using LinearAlgebra: dot, issymmetric
+using LinearAlgebra: Symmetric, dot, issymmetric
 using MatrixEquations
 using Random
 using Test
@@ -16,6 +16,24 @@ end
 
 function lyapd_weighted_sum(A, C, W)::Float64
     X = lyapd(A, C)
+    return dot(W, X)
+end
+
+function lyapd_symmetric(A, C)
+    return lyapd(A, Symmetric(C))
+end
+
+function lyapd_symmetric_weighted_sum(A, C, W)::Float64
+    X = lyapd_symmetric(A, C)
+    return dot(W, X)
+end
+
+function lyapd_symmetric_wrappers(A, C)
+    return lyapd(Symmetric(A), Symmetric(C))
+end
+
+function lyapd_symmetric_wrappers_weighted_sum(A, C, W)::Float64
+    X = lyapd_symmetric_wrappers(A, C)
     return dot(W, X)
 end
 
@@ -59,4 +77,54 @@ end
         (A, dA_dir), (C, dC_dir)
     )
     @test dot(dA, dA_dir) + dot(dC, dC_dir) ≈ dfd
+
+    dX = autodiff(
+        Forward, lyapd_symmetric, Duplicated,
+        Duplicated(A, dA_dir), Duplicated(C, dC_dir)
+    )[1]
+    dX_fd = jvp(fdm, lyapd_symmetric, (A, dA_dir), (C, dC_dir))
+    @test issymmetric(dX)
+    @test dX ≈ dX_fd
+
+    fill!(dA, 0)
+    fill!(dC, 0)
+    autodiff(
+        Reverse, lyapd_symmetric_weighted_sum, Active,
+        Duplicated(A, dA), Duplicated(C, dC), Const(W)
+    )
+    @test issymmetric(dC)
+    dfd_symmetric = jvp(
+        fdm, (A_, C_) -> lyapd_symmetric_weighted_sum(A_, C_, W),
+        (A, dA_dir), (C, dC_dir)
+    )
+    @test dot(dA, dA_dir) + dot(dC, dC_dir) ≈ dfd_symmetric
+
+    A_sym = [0.45 0.08; 0.08 0.35]
+    @test @inferred(lyapd(Symmetric(A_sym), Symmetric(C))) ≈ lyapd(A_sym, C)
+    dA0 = 0.1 .* randn(size(A_sym))
+    dA_sym_dir = 0.5 .* (dA0 + dA0')
+    dX_sym_wrappers = autodiff(
+        Forward, lyapd_symmetric_wrappers, Duplicated,
+        Duplicated(A_sym, dA_sym_dir), Duplicated(C, dC_dir)
+    )[1]
+    dX_sym_wrappers_fd = jvp(
+        fdm, lyapd_symmetric_wrappers,
+        (A_sym, dA_sym_dir), (C, dC_dir)
+    )
+    @test issymmetric(dX_sym_wrappers)
+    @test dX_sym_wrappers ≈ dX_sym_wrappers_fd
+
+    dA_wrapper = zero(A_sym)
+    fill!(dC, 0)
+    autodiff(
+        Reverse, lyapd_symmetric_wrappers_weighted_sum, Active,
+        Duplicated(A_sym, dA_wrapper), Duplicated(C, dC), Const(W)
+    )
+    @test issymmetric(dA_wrapper)
+    @test issymmetric(dC)
+    dfd_sym_wrappers = jvp(
+        fdm, (A_, C_) -> lyapd_symmetric_wrappers_weighted_sum(A_, C_, W),
+        (A_sym, dA_sym_dir), (C, dC_dir)
+    )
+    @test dot(dA_wrapper, dA_sym_dir) + dot(dC, dC_dir) ≈ dfd_sym_wrappers
 end
