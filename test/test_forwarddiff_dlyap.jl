@@ -12,6 +12,7 @@ using Test
     C = [1.0 0.2; 0.2 0.7]
     dAs = ntuple(_ -> 0.1 .* randn(size(A)), Val(N))
     dCs = ntuple(_ -> 0.1 .* randn(size(C)), Val(N))
+    DualT = ForwardDiff.Dual{Nothing, Float64, N}
 
     dual_A = map(A, dAs...) do a, ds...
         ForwardDiff.Dual{Nothing}(a, ds...)
@@ -19,6 +20,7 @@ using Test
     dual_C = map(C, dCs...) do c, ds...
         ForwardDiff.Dual{Nothing}(c, ds...)
     end
+    @test (@inferred lyapd(dual_A, dual_C)) isa Matrix{DualT}
     X = lyapd(dual_A, dual_C)
     result = autodiff(
         Forward, lyapd, Duplicated,
@@ -43,6 +45,7 @@ using Test
     dual_C_sym = map(C, dCs_sym...) do c, ds...
         ForwardDiff.Dual{Nothing}(c, ds...)
     end
+    @test (@inferred lyapd(dual_A_sym, dual_C_sym)) isa Matrix{DualT}
     X_sym = lyapd(dual_A_sym, dual_C_sym)
     result_sym = autodiff(
         Forward, lyapd, Duplicated,
@@ -58,6 +61,7 @@ using Test
     end
 
     dual_C_wrapper = Symmetric(dual_C_sym)
+    @test (@inferred lyapd(dual_A_sym, dual_C_wrapper)) isa Matrix{DualT}
     X_wrapper = lyapd(dual_A_sym, dual_C_wrapper)
     result_wrapper = autodiff(
         Forward, (A_, C_) -> lyapd(A_, Symmetric(C_)), Duplicated,

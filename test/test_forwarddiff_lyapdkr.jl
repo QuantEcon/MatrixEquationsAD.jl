@@ -17,6 +17,7 @@ using Test
         M = 0.1 .* randn(size(C))
         0.5 .* (M + M')
     end
+    DualT = ForwardDiff.Dual{Nothing, Float64, N}
 
     dual_A = map(A, dAs...) do a, ds...
         ForwardDiff.Dual{Nothing}(a, ds...)
@@ -24,6 +25,7 @@ using Test
     dual_C = map(C, dCs...) do c, ds...
         ForwardDiff.Dual{Nothing}(c, ds...)
     end
+    @test (@inferred lyapdkr(dual_A, dual_C)) isa Matrix{DualT}
     X = lyapdkr(dual_A, dual_C)
     result = autodiff(
         Forward, lyapdkr, Duplicated,
