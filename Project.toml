@@ -1,13 +1,40 @@
 name = "MatrixEquationsAD"
 uuid = "283a1a7b-c18a-432b-b100-bdc256e73a32"
+version = "0.1.0"
 authors = ["Jesse Perla <jesseperla@gmail.com> and contributors"]
-version = "1.0.0-DEV"
+
+[deps]
+ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
+
+[weakdeps]
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+
+[extensions]
+MatrixEquationsADEnzymeExt = ["Enzyme"]
+MatrixEquationsADForwardDiffExt = ["ForwardDiff"]
 
 [compat]
+ConcreteStructs = "0.2.4"
+Enzyme = "0.13"
+EnzymeTestUtils = "0.2"
+FiniteDifferences = "0.12"
+ForwardDiff = "1"
+LinearAlgebra = "1"
+MatrixEquations = "2.5.8"
+Random = "1"
+Test = "1"
 julia = "1.12"
 
 [extras]
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+EnzymeTestUtils = "12d8515a-0907-448a-8884-5fe00fdf1c5a"
+FiniteDifferences = "26cc04aa-876d-5657-8c51-4c34ba976000"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Enzyme", "EnzymeTestUtils", "FiniteDifferences", "ForwardDiff", "Random", "Test"]
