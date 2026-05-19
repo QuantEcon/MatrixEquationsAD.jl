@@ -83,9 +83,11 @@ and
 ```
 
 The implementation uses a Schur cache of `A` and reuses it across tangent
-directions or reverse seeds. When `A` or the right-hand side are passed as
-`Symmetric` wrappers, the rules dispatch to the symmetric Schur or `lyapds!`
-paths without scanning matrix entries. In reverse mode the symmetric
+directions or reverse seeds. When the right-hand side is passed as a
+`Symmetric` wrapper, the rules dispatch to the symmetric `lyapds!` path without
+scanning matrix entries. Otherwise, the rules use the general Sylvester path.
+The AD path is intentionally controlled only by the wrapper on `C`; `A` is
+treated as a general strided matrix. In reverse mode the symmetric
 right-hand-side path projects the cotangent onto the symmetric manifold.
 
 References:

@@ -8,13 +8,6 @@ function lyapdfactor(A::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
     return LyapDSchurCache(F.T, F.Z)
 end
 
-function lyapdfactor(
-        A::Symmetric{T, <:StridedMatrix{T}}
-    ) where {T <: Union{Float32, Float64}}
-    F = schur(A)
-    return LyapDSchurCache(F.T, F.Z)
-end
-
 function lyapdsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
     rhs = cache.Z' * C * cache.Z
     sylvds!(-cache.T, cache.T, rhs; adjB = true)
@@ -50,19 +43,7 @@ function lyapd(A::StridedMatrix{T}, C::StridedMatrix{T}) where {T <: Union{Float
 end
 
 function lyapd(
-        A::Symmetric{T, <:StridedMatrix{T}}, C::StridedMatrix{T}
-    ) where {T <: Union{Float32, Float64}}
-    return lyapdsolve(lyapdfactor(A), C)
-end
-
-function lyapd(
         A::StridedMatrix{T}, C::Symmetric{T, <:StridedMatrix{T}}
-    ) where {T <: Union{Float32, Float64}}
-    return lyapdsolve(lyapdfactor(A), C)
-end
-
-function lyapd(
-        A::Symmetric{T, <:StridedMatrix{T}}, C::Symmetric{T, <:StridedMatrix{T}}
     ) where {T <: Union{Float32, Float64}}
     return lyapdsolve(lyapdfactor(A), C)
 end
@@ -176,27 +157,7 @@ function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
         func::Const{typeof(lyapd)},
         ::Type{RT},
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
-        C::Annotation{<:StridedMatrix{T}}
-    ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_forward(config, RT, A, C)
-end
-
-function EnzymeRules.forward(
-        config::EnzymeRules.FwdConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
-    ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_forward(config, RT, A, C)
-end
-
-function EnzymeRules.forward(
-        config::EnzymeRules.FwdConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
         C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
     ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_forward(config, RT, A, C)
@@ -232,27 +193,7 @@ function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfig,
         func::Const{typeof(lyapd)},
         ::Type{RT},
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
-        C::Annotation{<:StridedMatrix{T}}
-    ) where {RT, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_augmented_primal(config, RT, A, C)
-end
-
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
-    ) where {RT, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_augmented_primal(config, RT, A, C)
-end
-
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
         C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
     ) where {RT, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_augmented_primal(config, RT, A, C)
@@ -303,29 +244,7 @@ function EnzymeRules.reverse(
         func::Const{typeof(lyapd)},
         ::Type{RT},
         tape,
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
-        C::Annotation{<:StridedMatrix{T}}
-    ) where {RT, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_reverse(config, RT, tape, A, C)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
-        tape,
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
-    ) where {RT, T <: Union{Float32, Float64}}
-    return _lyapd_enzyme_reverse(config, RT, tape, A, C)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfig,
-        func::Const{typeof(lyapd)},
-        ::Type{RT},
-        tape,
-        A::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
         C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
     ) where {RT, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_reverse(config, RT, tape, A, C)

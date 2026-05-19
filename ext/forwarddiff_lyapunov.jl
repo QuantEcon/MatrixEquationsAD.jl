@@ -8,13 +8,6 @@ function lyapdfactor(A::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
     return LyapDSchurCache(F.T, F.Z)
 end
 
-function lyapdfactor(
-        A::Symmetric{T, <:StridedMatrix{T}}
-    ) where {T <: Union{Float32, Float64}}
-    F = schur(A)
-    return LyapDSchurCache(F.T, F.Z)
-end
-
 function lyapdsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
     rhs = cache.Z' * C * cache.Z
     sylvds!(-cache.T, cache.T, rhs; adjB = true)
@@ -93,19 +86,7 @@ function lyapd(
 end
 
 function lyapd(
-        A::Symmetric{D, <:StridedMatrix{D}}, C::StridedMatrix{D}
-    ) where {T, V <: Union{Float32, Float64}, N, D <: Dual{T, V, N}}
-    return _lyapd_forwarddiff(A, C, D)
-end
-
-function lyapd(
         A::StridedMatrix{D}, C::Symmetric{D, <:StridedMatrix{D}}
-    ) where {T, V <: Union{Float32, Float64}, N, D <: Dual{T, V, N}}
-    return _lyapd_forwarddiff(A, C, D)
-end
-
-function lyapd(
-        A::Symmetric{D, <:StridedMatrix{D}}, C::Symmetric{D, <:StridedMatrix{D}}
     ) where {T, V <: Union{Float32, Float64}, N, D <: Dual{T, V, N}}
     return _lyapd_forwarddiff(A, C, D)
 end
