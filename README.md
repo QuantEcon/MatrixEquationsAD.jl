@@ -5,6 +5,7 @@
 Automatic differentiation support for selected
 [`MatrixEquations.jl`](https://github.com/andreasvarga/MatrixEquations.jl)
 functions, plus ordered-QZ helpers while those APIs are not available upstream.
+The implemented AD formulas are documented in [DERIVATIONS.md](DERIVATIONS.md).
 
 ```julia
 using MatrixEquations
