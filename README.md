@@ -77,6 +77,10 @@ using MatrixEquationsAD
 A = [1.6 0.2 0.1; 0.0 0.35 -0.1; 0.0 0.0 1.9]
 B = [1.0 0.1 0.0; 0.0 1.2 0.2; 0.0 0.0 0.8]
 
-F, sdim = ordqz(A, B, :bk; threshold = 1.0e-6)
-F.S, F.T, F.Q, F.Z, sdim
+n_unstable_expected = 2
+F, n_unstable = ordqz(A, B, :bk; threshold = 1.0e-6)
+n_unstable == n_unstable_expected ||
+    error("Blanchard-Kahn condition failed")
+
+F.S, F.T, F.Q, F.Z
 ```
