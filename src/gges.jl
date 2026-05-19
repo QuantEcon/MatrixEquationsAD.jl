@@ -42,11 +42,11 @@ function gges(
 end
 
 function gges!(
-        S::StridedMatrix{T}, Tmat::StridedMatrix{T},
-        Q::StridedMatrix{T}, Z::StridedMatrix{T},
+        S::AbstractMatrix, Tmat::AbstractMatrix,
+        Q::AbstractMatrix, Z::AbstractMatrix,
         A::AbstractMatrix, B::AbstractMatrix;
         select::Symbol = :ed, criterium = DEFAULT_GGES_CRITERIUM
-    ) where {T <: GGES_FLOAT}
+    )
     n = _gges_check_pair(A, B)
     _gges_check_output(:S, S, n)
     _gges_check_output(:T, Tmat, n)

@@ -21,4 +21,5 @@ using Test
     include("test_forwarddiff_sylvester.jl")
     include("test_forwarddiff_sylvkr.jl")
     include("test_forwarddiff_ordqz.jl")
+    include("test_forwarddiff_gges.jl")
 end
