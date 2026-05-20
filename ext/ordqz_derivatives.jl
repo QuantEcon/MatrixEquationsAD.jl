@@ -8,25 +8,21 @@
 function _ordqz_block_solve!(Mv, rhsv, M_save)
     copyto!(M_save, Mv)
     Tel = real(eltype(Mv))
-    m_scale = zero(Tel)
-    @inbounds for j in axes(M_save, 2), i in axes(M_save, 1)
-        m_scale = max(m_scale, abs(M_save[i, j]))
-    end
     F = lu!(Mv; check = false)
-    # Treat as singular if `lu!` failed, or if the smallest pivot is tiny
-    # relative to the matrix's largest entry (ill-conditioned but not exactly
-    # singular -- common in DSGE pencils with near-coincident eigenvalues).
+    # Treat as singular if `lu!` failed, or if the smallest pivot is below
+    # √eps (DSGE pencils often produce generalized eigenvalues ≪ machine
+    # epsilon -- treat those as numerically zero).
     min_pivot = LinearAlgebra.issuccess(F) ? abs(Mv[1, 1]) : zero(Tel)
     if LinearAlgebra.issuccess(F)
         @inbounds for i in 2:size(Mv, 1)
             min_pivot = min(min_pivot, abs(Mv[i, i]))
         end
     end
-    if min_pivot > sqrt(eps(Tel)) * m_scale
+    if min_pivot > sqrt(eps(Tel))
         ldiv!(F, rhsv)
         return rhsv
     end
-    delta = sqrt(eps(Tel)) * (m_scale + one(Tel))
+    delta = sqrt(eps(Tel))
     @inbounds for i in axes(M_save, 1)
         M_save[i, i] += delta
     end
@@ -114,18 +110,16 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                 end
                 # Original M = [-S_jj S_ii; -T_jj T_ii]; det(M) = S_ii*T_jj -
                 # S_jj*T_ii vanishes when blocks share a generalized eigenvalue
-                # (including the common DSGE case S_ii ≈ S_jj ≈ 0). Tikhonov-
-                # regularize by adding δ to the diagonal. The "is this matrix
-                # well-conditioned?" test compares |det| against √eps · ‖M‖²_∞;
-                # for our pencil this catches both exact singularity and the
-                # ill-conditioned case where det is tiny but not zero.
-                m_scale = max(abs(S_jj), abs(S_ii), abs(T_jj), abs(T_ii))
+                # (including the common DSGE case S_ii ≈ S_jj ≈ 0, where λ ≪ ε
+                # is numerically indistinguishable from zero). Tikhonov-
+                # regularize by adding δ to the diagonal if |det| is below
+                # √eps -- consistent with treating "λ smaller than √eps" as
+                # numerically zero.
                 a = -S_jj
                 d = T_ii
                 det = a * d - S_ii * (-T_jj)  # = S_ii*T_jj - S_jj*T_ii
-                tol = sqrt(eps(Tel)) * m_scale * m_scale
-                if abs(det) <= tol
-                    delta = sqrt(eps(Tel)) * (m_scale + one(Tel))
+                if abs(det) <= sqrt(eps(Tel))
+                    delta = sqrt(eps(Tel))
                     a += delta
                     d += delta
                     det = a * d - S_ii * (-T_jj)
