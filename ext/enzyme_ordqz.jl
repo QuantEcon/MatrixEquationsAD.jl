@@ -82,7 +82,7 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
                 end
             end
 
-            bar_rhs = transpose(M) \ bar_x
+            bar_rhs = _ordqz_block_solve(transpose(M), bar_x)
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     eq_S = (jj_loc - 1) * pi + ii_loc

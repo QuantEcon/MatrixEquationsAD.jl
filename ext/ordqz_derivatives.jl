@@ -1,3 +1,16 @@
+# Per-block 2pi*qj coupled Sylvester solve. M is singular when two diagonal
+# blocks of (S, T) share a generalized eigenvalue (e.g. duplicate zero or
+# infinite λ — common in DSGE pencils with many static equations). In that
+# case the off-diagonal Ω entries are not uniquely defined, but a minimum-norm
+# pseudoinverse solution still produces a finite tangent that the downstream
+# `dS`/`dT`/`dQ`/`dZ` assembly can consume. Falling back from `lu` keeps the
+# happy path at LU cost.
+function _ordqz_block_solve(M, rhs)
+    F = lu(M; check = false)
+    LinearAlgebra.issuccess(F) && return F \ rhs
+    return pinv(M) * rhs
+end
+
 function qzblocks(S)
     n = size(S, 1)
     nb = 0
@@ -87,7 +100,7 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                 end
             end
 
-            sol = M \ rhs
+            sol = _ordqz_block_solve(M, rhs)
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     idx = (jj_loc - 1) * pi + ii_loc

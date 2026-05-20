@@ -4,7 +4,7 @@ using ConcreteStructs: @concrete
 using ForwardDiff: Dual, Partials, partials, value
 using MatrixEquations
 using MatrixEquationsAD
-using LinearAlgebra: LinearAlgebra, StridedMatrix, Symmetric, mul!, schur
+using LinearAlgebra: LinearAlgebra, StridedMatrix, Symmetric, lu, mul!, pinv, schur
 
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:

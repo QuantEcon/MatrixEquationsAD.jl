@@ -13,7 +13,8 @@ using ConcreteStructs: @concrete
 using Enzyme:
     Annotation, BatchDuplicated, BatchDuplicatedNoNeed, Const,
     Duplicated, DuplicatedNoNeed
-using LinearAlgebra: Diagonal, LinearAlgebra, StridedMatrix, Symmetric, mul!, schur
+using LinearAlgebra:
+    Diagonal, LinearAlgebra, StridedMatrix, Symmetric, lu, mul!, pinv, schur
 
 include("enzyme_sylvester.jl")
 include("enzyme_lyapunov.jl")
