@@ -15,11 +15,12 @@ end
     threshold = 1.0e-6
     criterium = (1 - threshold)^2
 
-    F, expected = ordqz(A, B, :bk; threshold)
+    F = ordqz(A, B, :bk; threshold)
+    expected = F.sdim
     result = gges(A, B; select = :ed, criterium)
 
     @test expected == 2
-    @test result.n_explosive == expected
+    @test result.sdim == expected
     @test A == A0
     @test B == B0
     @test result.Q' * result.Q ≈ I
@@ -38,7 +39,7 @@ end
     @test inplace.T === T
     @test inplace.Q === Q
     @test inplace.Z === Z
-    @test inplace.n_explosive == expected
+    @test inplace.sdim == expected
     @test A == A0
     @test B == B0
     @test S ≈ result.S
@@ -62,7 +63,7 @@ end
     result = gges(A32, B32; select = :ed, criterium = Float32((1 - 1.0e-6)^2))
 
     @test eltype(result.S) === Float32
-    @test result.n_explosive == 2
+    @test result.sdim == 2
     @test result.Q' * result.Q ≈ I atol = 1.0e-5
     @test result.Z' * result.Z ≈ I atol = 1.0e-5
     @test A32 ≈ result.Q * result.S * result.Z' atol = 1.0e-5
@@ -75,7 +76,7 @@ end
         criterium = (1 - threshold)^2
         result = gges(A, B; select = :ed, criterium)
 
-        @test result.n_explosive == expected
+        @test result.sdim == expected
         @test result.Q' * result.Q ≈ I
         @test result.Z' * result.Z ≈ I
         @test A ≈ result.Q * result.S * result.Z'

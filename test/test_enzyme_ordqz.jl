@@ -31,7 +31,7 @@ end
 
 function gges_enzyme_sum!(S, T, Q, Z, A, B)::Float64
     result = gges!(S, T, Q, Z, A, B; select = :ed, criterium = (1 - 1.0e-6)^2)
-    scale = result.n_explosive == 2 ? 1.0 : -1.0
+    scale = result.sdim == 2 ? 1.0 : -1.0
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 
@@ -41,7 +41,7 @@ function gges_reverse_reconstruction_sum(A, B)::Float64
     Q = zero(A)
     Z = zero(A)
     result = gges!(S, T, Q, Z, A, B; select = :ed, criterium = (1 - 1.0e-6)^2)
-    scale = result.n_explosive == 2 ? 1.0 : -1.0
+    scale = result.sdim == 2 ? 1.0 : -1.0
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 

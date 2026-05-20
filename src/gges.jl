@@ -69,8 +69,8 @@ function _gges!(
 
     copyto!(S, A)
     copyto!(Tmat, B)
-    n_explosive = _gges_lapack_ed!(S, Tmat, Q, Z, T(criterium))
-    return (; S, T = Tmat, Q, Z, n_explosive)
+    sdim = _gges_lapack_ed!(S, Tmat, Q, Z, T(criterium))
+    return (; S, T = Tmat, Q, Z, sdim)
 end
 
 function _gges_ordschur!(
@@ -88,13 +88,13 @@ function _gges_ordschur!(
     @inbounds for i in 1:n
         selection[i] = abs2(F.α[i]) >= criterium * abs2(F.β[i])
     end
-    n_explosive = count(selection)
+    sdim = count(selection)
     ordschur!(F, selection)
     copyto!(S, F.S)
     copyto!(Tmat, F.T)
     copyto!(Q, F.Q)
     copyto!(Z, F.Z)
-    return (; S, T = Tmat, Q, Z, n_explosive)
+    return (; S, T = Tmat, Q, Z, sdim)
 end
 
 function _gges_check_pair(A::AbstractMatrix, B::AbstractMatrix)

@@ -19,7 +19,7 @@ function gges_forwarddiff_sum(A, B, expected; criterium = (1 - 1.0e-6)^2)::eltyp
     Q = zero(A)
     Z = zero(A)
     result = gges!(S, T, Q, Z, A, B; select = :ed, criterium)
-    scale = result.n_explosive == expected ? one(eltype(A)) : -one(eltype(A))
+    scale = result.sdim == expected ? one(eltype(A)) : -one(eltype(A))
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 
@@ -73,5 +73,5 @@ end
         zero(A_dp_dual), zero(B_dp_dual), zero(A_dp_dual), zero(A_dp_dual),
         A_dp_dual, B_dp_dual; select = :ed, criterium = criterium_dp
     )
-    @test result_dp.n_explosive == expected
+    @test result_dp.sdim == expected
 end

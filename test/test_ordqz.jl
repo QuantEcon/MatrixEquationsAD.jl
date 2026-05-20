@@ -10,7 +10,8 @@ end
 
 @testset "ordered QZ wrapper" begin
     A, B = ordqz_problem()
-    F, sdim = ordqz(A, B, :bk)
+    F = ordqz(A, B, :bk)
+    sdim = F.sdim
     F_ref = schur(A, B)
     select = abs2.(F_ref.α) .>= (1 - 1.0e-6)^2 .* abs2.(F_ref.β)
     ordschur!(F_ref, select)
@@ -38,7 +39,8 @@ end
 
 @testset "ordered QZ DifferentiablePerturbation fixtures" begin
     for (A, B, expected) in (dp_rbc_ordqz_problem(), dp_rbc_sv_ordqz_problem())
-        F, sdim = ordqz(A, B, :bk; threshold = dp_ordqz_threshold)
+        F = ordqz(A, B, :bk; threshold = dp_ordqz_threshold)
+        sdim = F.sdim
         F_ref = schur(A, B)
         select = abs2.(F_ref.α) .>= (1 - dp_ordqz_threshold)^2 .* abs2.(F_ref.β)
         @test sdim == expected

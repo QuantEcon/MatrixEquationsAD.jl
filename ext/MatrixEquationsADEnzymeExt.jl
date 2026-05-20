@@ -6,8 +6,9 @@ using MatrixEquationsAD
 import Enzyme.EnzymeRules
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
-    _gges!, _gges_ordschur!, _lyapdkr_check!, _ordqz!, _symmetrize_square!, lyapdkr,
-    lyapdkradjointsolve, lyapdkrfactor, lyapdkrsolve
+    DEFAULT_BK_THRESHOLD, _gges!, _gges_ordschur!, _lyapdkr_check!, _ordqz!,
+    _symmetrize_square!, gges, lyapdkr, lyapdkradjointsolve, lyapdkrfactor,
+    lyapdkrsolve, ordqz
 using ConcreteStructs: @concrete
 using Enzyme:
     Annotation, BatchDuplicated, BatchDuplicatedNoNeed, Const,
@@ -21,5 +22,6 @@ include("riccati_derivatives.jl")
 include("enzyme_riccati.jl")
 include("ordqz_derivatives.jl")
 include("enzyme_ordqz.jl")
+include("enzyme_ordqz_oop.jl")
 
 end

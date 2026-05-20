@@ -22,4 +22,5 @@ using Test
     include("test_forwarddiff_sylvkr.jl")
     include("test_forwarddiff_ordqz.jl")
     include("test_forwarddiff_gges.jl")
+    include("test_oop_gges_ordqz.jl")
 end

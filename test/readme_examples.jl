@@ -64,14 +64,14 @@ end
 
         eps_BK = 1.0e-6
         n_unstable_expected = 2
-        (; S, T, Q, Z, n_explosive) = gges(
+        (; S, T, Q, Z, sdim) = gges(
             A, B;
             select = :ed, criterium = (1 - eps_BK)^2
         )
-        n_explosive == n_unstable_expected ||
+        sdim == n_unstable_expected ||
             error("Blanchard-Kahn condition failed")
 
-        @test n_explosive == 2
+        @test sdim == 2
         @test A ≈ Q * S * Z'
         @test B ≈ Q * T * Z'
     end

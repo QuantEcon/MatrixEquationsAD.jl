@@ -46,5 +46,5 @@ function _gges!(
         )
     end
 
-    return (; S, T = Targ, Q, Z, n_explosive = primal.n_explosive)
+    return (; S, T = Targ, Q, Z, sdim = primal.sdim)
 end

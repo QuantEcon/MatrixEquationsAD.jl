@@ -24,11 +24,16 @@ function ordqz(
         A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol = :bk;
         threshold = DEFAULT_BK_THRESHOLD
     )
-    F = schur(A, B)
-    selection = qzselection(F, ordering, threshold)
-    sdim = count(selection)
-    ordschur!(F, selection)
-    return F, sdim
+    n = checksquare(A)
+    checksquare(B) == n ||
+        throw(DimensionMismatch("A and B must have matching square sizes"))
+    Tel = promote_type(eltype(A), eltype(B))
+    S = Matrix{Tel}(undef, n, n)
+    T = Matrix{Tel}(undef, n, n)
+    Q = Matrix{Tel}(undef, n, n)
+    Z = Matrix{Tel}(undef, n, n)
+    sdim = ordqz!(S, T, Q, Z, A, B, ordering; threshold)
+    return (; S, T, Q, Z, sdim)
 end
 
 function ordqz!(
