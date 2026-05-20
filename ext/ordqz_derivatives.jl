@@ -1,14 +1,18 @@
-# Per-block 2pi*qj coupled Sylvester solve. M is singular when two diagonal
-# blocks of (S, T) share a generalized eigenvalue (e.g. duplicate zero or
-# infinite λ — common in DSGE pencils with many static equations). In that
-# case the off-diagonal Ω entries are not uniquely defined, but a minimum-norm
-# pseudoinverse solution still produces a finite tangent that the downstream
-# `dS`/`dT`/`dQ`/`dZ` assembly can consume. Falling back from `lu` keeps the
-# happy path at LU cost.
-function _ordqz_block_solve(M, rhs)
-    F = lu(M; check = false)
-    LinearAlgebra.issuccess(F) && return F \ rhs
-    return pinv(M) * rhs
+# In-place per-block solve. Mv, rhsv are views into a hoisted 8x8 / length-8
+# buffer; we factor in-place with `lu!` and solve in-place with `ldiv!` so the
+# happy path stays alloc-free. When M is singular (e.g. coincident generalized
+# eigenvalues, common in DSGE pencils with many static equations), the
+# minimum-norm pseudoinverse is used to keep the tangent finite — that path
+# allocates a small SVD but only fires on near-singular blocks.
+function _ordqz_block_solve!(Mv, rhsv, M_save)
+    copyto!(M_save, Mv)
+    F = lu!(Mv; check = false)
+    if LinearAlgebra.issuccess(F)
+        ldiv!(F, rhsv)
+        return rhsv
+    end
+    rhsv .= pinv(M_save) * rhsv
+    return rhsv
 end
 
 function qzblocks(S)
@@ -43,12 +47,18 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
     starts, sizes = qzblocks(S)
     nb = length(starts)
 
-    E = zeros(eltype(S), n, n)
-    F = zeros(eltype(S), n, n)
-    OmegaQ = zeros(eltype(S), n, n)
-    OmegaZ = zeros(eltype(S), n, n)
-    tmp1 = zeros(eltype(S), n, n)
-    tmp2 = zeros(eltype(S), n, n)
+    Tel = eltype(S)
+    E = zeros(Tel, n, n)
+    F = zeros(Tel, n, n)
+    OmegaQ = zeros(Tel, n, n)
+    OmegaZ = zeros(Tel, n, n)
+    tmp1 = zeros(Tel, n, n)
+    tmp2 = zeros(Tel, n, n)
+
+    # Per-block-pair scratch: blocks are 1 or 2, so n_unknowns ≤ 8.
+    M_buf = Matrix{Tel}(undef, 8, 8)
+    M_save = Matrix{Tel}(undef, 8, 8)
+    rhs_buf = Vector{Tel}(undef, 8)
 
     mul!(tmp1, transpose(Q), dA)
     mul!(E, tmp1, Z)
@@ -63,10 +73,57 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
         for ib in nb:-1:(jb + 1)
             i_start = starts[ib]
             pi = sizes[ib]
+            if pi == 1 && qj == 1
+                # Fast inline 2x2 path: the common DSGE case (1x1 blocks on
+                # both sides). M = [-S_jj S_ii; -T_jj T_ii] and rhs has two
+                # entries. Direct Cramer-rule solve, with a closed-form
+                # minimum-norm pseudoinverse for the rank-deficient case.
+                ii = i_start
+                jj = j_start
+                S_ii = S[ii, ii]; T_ii = T[ii, ii]
+                S_jj = S[jj, jj]; T_jj = T[jj, jj]
+                rhs_S = -E[ii, jj]
+                rhs_T = -F[ii, jj]
+                for k in (i_start + 1):n
+                    rhs_S -= S[ii, k] * OmegaZ[k, jj]
+                    rhs_T -= T[ii, k] * OmegaZ[k, jj]
+                end
+                for k in 1:(j_start - 1)
+                    rhs_S += OmegaQ[ii, k] * S[k, jj]
+                    rhs_T += OmegaQ[ii, k] * T[k, jj]
+                end
+                det = S_ii * T_jj - S_jj * T_ii
+                tol = eps(Tel) * (abs(S_ii * T_jj) + abs(S_jj * T_ii))
+                if abs(det) > tol
+                    inv_det = inv(det)
+                    sol_1 = (T_ii * rhs_S - S_ii * rhs_T) * inv_det
+                    sol_2 = (T_jj * rhs_S - S_jj * rhs_T) * inv_det
+                else
+                    # Rank-deficient 2x2: M⁺ = Mᵀ / ‖M‖²_F. Picks the
+                    # minimum-norm solution; falls back to zero for M = 0.
+                    fn2 = S_jj * S_jj + S_ii * S_ii + T_jj * T_jj + T_ii * T_ii
+                    if fn2 > zero(Tel)
+                        scale = inv(fn2)
+                        sol_1 = (-S_jj * rhs_S - T_jj * rhs_T) * scale
+                        sol_2 = (S_ii * rhs_S + T_ii * rhs_T) * scale
+                    else
+                        sol_1 = zero(Tel)
+                        sol_2 = zero(Tel)
+                    end
+                end
+                OmegaQ[ii, jj] = sol_1
+                OmegaQ[jj, ii] = -sol_1
+                OmegaZ[ii, jj] = sol_2
+                OmegaZ[jj, ii] = -sol_2
+                continue
+            end
+
             i_range = i_start:(i_start + pi - 1)
             n_unknowns = 2 * pi * qj
-            rhs = zeros(eltype(S), n_unknowns)
-            M = zeros(eltype(S), n_unknowns, n_unknowns)
+            Mv = view(M_buf, 1:n_unknowns, 1:n_unknowns)
+            rhsv = view(rhs_buf, 1:n_unknowns)
+            Msv = view(M_save, 1:n_unknowns, 1:n_unknowns)
+            fill!(Mv, zero(Tel))
 
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
@@ -84,30 +141,30 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                         rhs_T += OmegaQ[ii, k] * T[k, jj]
                     end
 
-                    rhs[eq_S] = rhs_S
-                    rhs[eq_T] = rhs_T
+                    rhsv[eq_S] = rhs_S
+                    rhsv[eq_T] = rhs_T
 
                     for (kk_loc, kk) in enumerate(j_range)
                         col = (kk_loc - 1) * pi + ii_loc
-                        M[eq_S, col] -= S[kk, jj]
-                        M[eq_T, col] -= T[kk, jj]
+                        Mv[eq_S, col] -= S[kk, jj]
+                        Mv[eq_T, col] -= T[kk, jj]
                     end
                     for (kk_loc, kk) in enumerate(i_range)
                         col = pi * qj + (jj_loc - 1) * pi + kk_loc
-                        M[eq_S, col] += S[ii, kk]
-                        M[eq_T, col] += T[ii, kk]
+                        Mv[eq_S, col] += S[ii, kk]
+                        Mv[eq_T, col] += T[ii, kk]
                     end
                 end
             end
 
-            sol = _ordqz_block_solve(M, rhs)
+            _ordqz_block_solve!(Mv, rhsv, Msv)
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     idx = (jj_loc - 1) * pi + ii_loc
-                    OmegaQ[ii, jj] = sol[idx]
-                    OmegaQ[jj, ii] = -sol[idx]
-                    OmegaZ[ii, jj] = sol[pi * qj + idx]
-                    OmegaZ[jj, ii] = -sol[pi * qj + idx]
+                    OmegaQ[ii, jj] = rhsv[idx]
+                    OmegaQ[jj, ii] = -rhsv[idx]
+                    OmegaZ[ii, jj] = rhsv[pi * qj + idx]
+                    OmegaZ[jj, ii] = -rhsv[pi * qj + idx]
                 end
             end
         end

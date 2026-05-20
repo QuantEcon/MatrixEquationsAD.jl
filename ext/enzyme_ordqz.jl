@@ -3,12 +3,18 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
     starts, sizes = qzblocks(S)
     nb = length(starts)
 
-    OmegaQ = zeros(eltype(S), n, n)
-    OmegaZ = zeros(eltype(S), n, n)
-    tmp1 = zeros(eltype(S), n, n)
-    tmp2 = zeros(eltype(S), n, n)
-    bar_E = zeros(eltype(S), n, n)
-    bar_F = zeros(eltype(S), n, n)
+    Tel = eltype(S)
+    OmegaQ = zeros(Tel, n, n)
+    OmegaZ = zeros(Tel, n, n)
+    tmp1 = zeros(Tel, n, n)
+    tmp2 = zeros(Tel, n, n)
+    bar_E = zeros(Tel, n, n)
+    bar_F = zeros(Tel, n, n)
+
+    # Per-block-pair scratch hoisted out of the inner loop (blocks ≤ 2 each).
+    M_buf = Matrix{Tel}(undef, 8, 8)
+    M_save = Matrix{Tel}(undef, 8, 8)
+    bar_x_buf = Vector{Tel}(undef, 8)
 
     @inbounds for j in 1:n, i in 1:n
         tmp1[i, j] = dS[i, j]
@@ -54,7 +60,10 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
             pi = sizes[ib]
             i_range = i_start:(i_start + pi - 1)
             n_unknowns = 2 * pi * qj
-            M = zeros(eltype(S), n_unknowns, n_unknowns)
+            Mv = view(M_buf, 1:n_unknowns, 1:n_unknowns)
+            bar_x = view(bar_x_buf, 1:n_unknowns)
+            Msv = view(M_save, 1:n_unknowns, 1:n_unknowns)
+            fill!(Mv, zero(Tel))
 
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
@@ -62,18 +71,17 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
                     eq_T = pi * qj + eq_S
                     for (kk_loc, kk) in enumerate(j_range)
                         col = (kk_loc - 1) * pi + ii_loc
-                        M[eq_S, col] -= S[kk, jj]
-                        M[eq_T, col] -= T[kk, jj]
+                        Mv[eq_S, col] -= S[kk, jj]
+                        Mv[eq_T, col] -= T[kk, jj]
                     end
                     for (kk_loc, kk) in enumerate(i_range)
                         col = pi * qj + (jj_loc - 1) * pi + kk_loc
-                        M[eq_S, col] += S[ii, kk]
-                        M[eq_T, col] += T[ii, kk]
+                        Mv[eq_S, col] += S[ii, kk]
+                        Mv[eq_T, col] += T[ii, kk]
                     end
                 end
             end
 
-            bar_x = zeros(eltype(S), n_unknowns)
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     idx = (jj_loc - 1) * pi + ii_loc
@@ -82,7 +90,12 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
                 end
             end
 
-            bar_rhs = _ordqz_block_solve(transpose(M), bar_x)
+            # Solve transpose(M) * bar_rhs = bar_x. Stage transpose into Mv
+            # in-place (it's square) so the in-place LU/solve still applies.
+            transpose!(Msv, Mv)
+            copyto!(Mv, Msv)
+            _ordqz_block_solve!(Mv, bar_x, Msv)
+            bar_rhs = bar_x
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     eq_S = (jj_loc - 1) * pi + ii_loc
@@ -156,7 +169,18 @@ function EnzymeRules.forward(
         S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
     )
 
-    if EnzymeRules.needs_shadow(config)
+    # NOTE: the tangent loop must run whenever any of the input/output args has
+    # a Duplicated/BatchDuplicated annotation -- _not_ gated on
+    # EnzymeRules.needs_shadow(config), which queries the return-value shadow.
+    # _ordqz!/_gges! return an Int (sdim), so the return is always Const and
+    # needs_shadow is false; that previously caused the rule to silently skip
+    # tangent propagation through the mutated S/T/Q/Z buffers.
+    any_dup = !(
+        typeof(S) <: Const && typeof(Targ) <: Const &&
+        typeof(Q) <: Const && typeof(Z) <: Const &&
+        typeof(A) <: Const && typeof(B) <: Const
+    )
+    if any_dup
         N = EnzymeRules.width(config)
         for i in 1:N
             dA = if typeof(A) <: Const
