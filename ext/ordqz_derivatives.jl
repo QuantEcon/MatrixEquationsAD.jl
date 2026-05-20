@@ -1,17 +1,37 @@
 # In-place per-block solve. Mv, rhsv are views into a hoisted 8x8 / length-8
 # buffer; we factor in-place with `lu!` and solve in-place with `ldiv!` so the
 # happy path stays alloc-free. When M is singular (e.g. coincident generalized
-# eigenvalues, common in DSGE pencils with many static equations), the
-# minimum-norm pseudoinverse is used to keep the tangent finite — that path
-# allocates a small SVD but only fires on near-singular blocks.
+# eigenvalues, common in DSGE pencils with many static equations), we
+# Tikhonov-regularize by adding `δI` to M and re-solving. The tangent at a
+# coincident-eigenvalue point isn't unique anyway, so any small regularization
+# that keeps the factorization stable is acceptable.
 function _ordqz_block_solve!(Mv, rhsv, M_save)
     copyto!(M_save, Mv)
+    Tel = real(eltype(Mv))
+    m_scale = zero(Tel)
+    @inbounds for j in axes(M_save, 2), i in axes(M_save, 1)
+        m_scale = max(m_scale, abs(M_save[i, j]))
+    end
     F = lu!(Mv; check = false)
+    # Treat as singular if `lu!` failed, or if the smallest pivot is tiny
+    # relative to the matrix's largest entry (ill-conditioned but not exactly
+    # singular -- common in DSGE pencils with near-coincident eigenvalues).
+    min_pivot = LinearAlgebra.issuccess(F) ? abs(Mv[1, 1]) : zero(Tel)
     if LinearAlgebra.issuccess(F)
+        @inbounds for i in 2:size(Mv, 1)
+            min_pivot = min(min_pivot, abs(Mv[i, i]))
+        end
+    end
+    if min_pivot > sqrt(eps(Tel)) * m_scale
         ldiv!(F, rhsv)
         return rhsv
     end
-    rhsv .= pinv(M_save) * rhsv
+    delta = sqrt(eps(Tel)) * (m_scale + one(Tel))
+    @inbounds for i in axes(M_save, 1)
+        M_save[i, i] += delta
+    end
+    F = lu!(M_save; check = false)
+    ldiv!(F, rhsv)
     return rhsv
 end
 
@@ -92,25 +112,27 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                     rhs_S += OmegaQ[ii, k] * S[k, jj]
                     rhs_T += OmegaQ[ii, k] * T[k, jj]
                 end
-                det = S_ii * T_jj - S_jj * T_ii
-                tol = eps(Tel) * (abs(S_ii * T_jj) + abs(S_jj * T_ii))
-                if abs(det) > tol
-                    inv_det = inv(det)
-                    sol_1 = (T_ii * rhs_S - S_ii * rhs_T) * inv_det
-                    sol_2 = (T_jj * rhs_S - S_jj * rhs_T) * inv_det
-                else
-                    # Rank-deficient 2x2: M⁺ = Mᵀ / ‖M‖²_F. Picks the
-                    # minimum-norm solution; falls back to zero for M = 0.
-                    fn2 = S_jj * S_jj + S_ii * S_ii + T_jj * T_jj + T_ii * T_ii
-                    if fn2 > zero(Tel)
-                        scale = inv(fn2)
-                        sol_1 = (-S_jj * rhs_S - T_jj * rhs_T) * scale
-                        sol_2 = (S_ii * rhs_S + T_ii * rhs_T) * scale
-                    else
-                        sol_1 = zero(Tel)
-                        sol_2 = zero(Tel)
-                    end
+                # Original M = [-S_jj S_ii; -T_jj T_ii]; det(M) = S_ii*T_jj -
+                # S_jj*T_ii vanishes when blocks share a generalized eigenvalue
+                # (including the common DSGE case S_ii ≈ S_jj ≈ 0). Tikhonov-
+                # regularize by adding δ to the diagonal. The "is this matrix
+                # well-conditioned?" test compares |det| against √eps · ‖M‖²_∞;
+                # for our pencil this catches both exact singularity and the
+                # ill-conditioned case where det is tiny but not zero.
+                m_scale = max(abs(S_jj), abs(S_ii), abs(T_jj), abs(T_ii))
+                a = -S_jj
+                d = T_ii
+                det = a * d - S_ii * (-T_jj)  # = S_ii*T_jj - S_jj*T_ii
+                tol = sqrt(eps(Tel)) * m_scale * m_scale
+                if abs(det) <= tol
+                    delta = sqrt(eps(Tel)) * (m_scale + one(Tel))
+                    a += delta
+                    d += delta
+                    det = a * d - S_ii * (-T_jj)
                 end
+                inv_det = inv(det)
+                sol_1 = (d * rhs_S - S_ii * rhs_T) * inv_det
+                sol_2 = (a * rhs_T + T_jj * rhs_S) * inv_det
                 OmegaQ[ii, jj] = sol_1
                 OmegaQ[jj, ii] = -sol_1
                 OmegaZ[ii, jj] = sol_2

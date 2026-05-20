@@ -15,7 +15,7 @@ using Enzyme:
     Duplicated, DuplicatedNoNeed
 using LinearAlgebra:
     Diagonal, LinearAlgebra, StridedMatrix, Symmetric,
-    ldiv!, lu, lu!, mul!, pinv, schur, transpose!
+    ldiv!, lu, lu!, mul!, schur, transpose!
 
 include("enzyme_sylvester.jl")
 include("enzyme_lyapunov.jl")

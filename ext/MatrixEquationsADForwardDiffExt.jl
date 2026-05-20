@@ -6,7 +6,7 @@ using MatrixEquations
 using MatrixEquationsAD
 using LinearAlgebra:
     LinearAlgebra, StridedMatrix, Symmetric,
-    ldiv!, lu, lu!, mul!, pinv, schur, transpose!
+    ldiv!, lu, lu!, mul!, schur, transpose!
 
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
