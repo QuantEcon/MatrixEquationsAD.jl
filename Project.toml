@@ -3,6 +3,9 @@ uuid = "283a1a7b-c18a-432b-b100-bdc256e73a32"
 version = "0.1.0"
 authors = ["Jesse Perla <jesseperla@gmail.com> and contributors"]
 
+[workspace]
+projects = ["test", "benchmark"]
+
 [deps]
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -11,10 +14,12 @@ MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
 [weakdeps]
 Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extensions]
 MatrixEquationsADEnzymeExt = ["Enzyme"]
 MatrixEquationsADForwardDiffExt = ["ForwardDiff"]
+MatrixEquationsADStaticArraysExt = ["StaticArrays"]
 
 [compat]
 ConcreteStructs = "0.2.4"
@@ -25,6 +30,7 @@ ForwardDiff = "1"
 LinearAlgebra = "1"
 MatrixEquations = "2.5.8"
 Random = "1"
+StaticArrays = "1"
 Test = "1"
 julia = "1.12"
 
@@ -38,6 +44,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Enzyme", "EnzymeTestUtils", "FiniteDifferences", "ForwardDiff", "Random", "Test"]
-
-[workspace]
-projects = ["test"]
