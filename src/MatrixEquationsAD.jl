@@ -2,11 +2,13 @@ module MatrixEquationsAD
 
 using ConcreteStructs: @concrete
 using LinearAlgebra:
-    GeneralizedSchur, LU, checksquare, issuccess, ldiv!, lu!, ordschur!, schur
+    GeneralizedSchur, LU, UpperTriangular, checksquare, issuccess, ldiv!, lu!, mul!,
+    ordschur!, schur
 
-export lyapdkr, ordqz, ordqz!
+export klein_map, klein_map!, lyapdkr, ordqz, ordqz!
 
 include("lyapdkr.jl")
 include("ordqz.jl")
+include("klein_map.jl")
 
 end

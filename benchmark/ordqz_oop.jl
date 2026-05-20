@@ -3,8 +3,6 @@ using Enzyme: Active, BatchDuplicated, Const, Duplicated, Enzyme, Forward, Rever
 using MatrixEquationsAD
 using StaticArrays: SMatrix
 
-const ORDQZ_OOP_ENZ_LANES = 4
-
 function ordqz_oop_loss(A, B, threshold)
     r = ordqz(A, B, :bk; threshold)
     return sum(abs2, r.Q * r.S * r.Z')
@@ -40,8 +38,8 @@ function ordqz_oop_heap_group(problem)
     ) setup = begin
         A = copy($(problem.A))
         B = copy($(problem.B))
-        A_tans = ntuple(i -> copy($(problem.dA_lanes)[i]), Val($ORDQZ_OOP_ENZ_LANES))
-        B_tans = ntuple(i -> copy($(problem.dB_lanes)[i]), Val($ORDQZ_OOP_ENZ_LANES))
+        A_tans = ntuple(i -> copy($(problem.dA_lanes)[i]), Val(4))
+        B_tans = ntuple(i -> copy($(problem.dB_lanes)[i]), Val(4))
         threshold = $(problem.threshold)
     end evals = 1
 

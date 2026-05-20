@@ -23,4 +23,6 @@ using Test
     include("test_oop_ordqz.jl")
     include("test_fvgq_ordqz.jl")
     include("test_dsge_qz_ad.jl")
+    include("test_dsge_qz_ad_exact.jl")
+    include("test_klein_map.jl")
 end

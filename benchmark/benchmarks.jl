@@ -17,9 +17,8 @@ SUITE["ared"]    = include(joinpath(_bdir, "ared.jl"))
 SUITE["gsylv"]   = include(joinpath(_bdir, "gsylv.jl"))
 SUITE["gsylvkr"] = include(joinpath(_bdir, "gsylvkr.jl"))
 SUITE["ordqz"]     = include(joinpath(_bdir, "ordqz.jl"))
-SUITE["gges"]      = include(joinpath(_bdir, "gges.jl"))
 SUITE["ordqz_oop"] = include(joinpath(_bdir, "ordqz_oop.jl"))
-SUITE["gges_oop"]  = include(joinpath(_bdir, "gges_oop.jl"))
+SUITE["klein_map_oop"] = include(joinpath(_bdir, "klein_map_oop.jl"))
 
 # Warmup forces Enzyme rule precompilation and ForwardDiff Dual dispatch so the
 # timed runs don't measure compile time. Mirrors DP's warmup_problem.
@@ -171,34 +170,6 @@ function _warmup_ordqz(p)
     return nothing
 end
 
-function _warmup_gges(p)
-    A = copy(p.A); B = copy(p.B)
-    criterium = (1 - p.threshold)^2
-    A_bar = zero(A); B_bar = zero(B)
-    Enzyme.autodiff(
-        Reverse, gges_reverse_loss, Active,
-        Duplicated(A, A_bar), Duplicated(B, B_bar),
-        Const(criterium),
-    )
-    A2 = copy(p.A); B2 = copy(p.B)
-    S = zeros(size(A)); T = zeros(size(B)); Q = zeros(size(A)); Z = zeros(size(A))
-    A_tans = ntuple(i -> copy(p.dA_lanes[i]), Val(GGES_ENZ_LANES))
-    B_tans = ntuple(i -> copy(p.dB_lanes[i]), Val(GGES_ENZ_LANES))
-    S_tans = ntuple(_ -> zeros(size(A)), Val(GGES_ENZ_LANES))
-    T_tans = ntuple(_ -> zeros(size(B)), Val(GGES_ENZ_LANES))
-    Q_tans = ntuple(_ -> zeros(size(A)), Val(GGES_ENZ_LANES))
-    Z_tans = ntuple(_ -> zeros(size(A)), Val(GGES_ENZ_LANES))
-    Enzyme.autodiff(
-        Forward, gges_forward_loss!, BatchDuplicated,
-        BatchDuplicated(S, S_tans), BatchDuplicated(T, T_tans),
-        BatchDuplicated(Q, Q_tans), BatchDuplicated(Z, Z_tans),
-        BatchDuplicated(A2, A_tans), BatchDuplicated(B2, B_tans),
-        Const(criterium),
-    )
-    gges_reverse_loss(dual_matrix(p.A, p.dA_lanes), dual_matrix(p.B, p.dB_lanes), criterium)
-    return nothing
-end
-
 for p in (lyapd_small_problem(), lyapd_medium_problem())
     _warmup_lyapd(p)
     _warmup_lyapdkr(p)
@@ -211,45 +182,28 @@ for p in (gsylv_small_problem(), gsylv_medium_problem())
     _warmup_gsylvkr(p)
 end
 function _warmup_qz_oop_heap(p)
-    A = copy(p.A); B = copy(p.B); thr = p.threshold; crit = (1 - thr)^2
-    gges_oop_loss(A, B, crit)
+    A = copy(p.A); B = copy(p.B); thr = p.threshold
     ordqz_oop_loss(A, B, thr)
     dA = zero(A); dB = zero(B)
-    Enzyme.autodiff(
-        Reverse, gges_oop_loss, Active,
-        Duplicated(A, dA), Duplicated(B, dB), Const(crit),
-    )
-    dA .= 0; dB .= 0
     Enzyme.autodiff(
         Reverse, ordqz_oop_loss, Active,
         Duplicated(A, dA), Duplicated(B, dB), Const(thr),
     )
-    A_tans = ntuple(i -> copy(p.dA_lanes[i]), Val(GGES_OOP_ENZ_LANES))
-    B_tans = ntuple(i -> copy(p.dB_lanes[i]), Val(GGES_OOP_ENZ_LANES))
-    Enzyme.autodiff(
-        Forward, gges_oop_loss, BatchDuplicated,
-        BatchDuplicated(A, A_tans), BatchDuplicated(B, B_tans), Const(crit),
-    )
+    A_tans = ntuple(i -> copy(p.dA_lanes[i]), Val(4))
+    B_tans = ntuple(i -> copy(p.dB_lanes[i]), Val(4))
     Enzyme.autodiff(
         Forward, ordqz_oop_loss, BatchDuplicated,
         BatchDuplicated(A, A_tans), BatchDuplicated(B, B_tans), Const(thr),
     )
-    gges_oop_loss(dual_matrix(p.A, p.dA_lanes), dual_matrix(p.B, p.dB_lanes), crit)
     ordqz_oop_loss(dual_matrix(p.A, p.dA_lanes), dual_matrix(p.B, p.dB_lanes), thr)
     return nothing
 end
 
 function _warmup_qz_oop_static(p)
-    A = p.A; B = p.B; thr = p.threshold; crit = (1 - thr)^2
-    gges_oop_loss(A, B, crit)
+    A = p.A; B = p.B; thr = p.threshold
     ordqz_oop_loss(A, B, thr)
-    Enzyme.autodiff(Reverse, gges_oop_loss, Active, Active(A), Active(B), Const(crit))
     Enzyme.autodiff(Reverse, ordqz_oop_loss, Active, Active(A), Active(B), Const(thr))
     A_tans = p.dA_lanes; B_tans = p.dB_lanes
-    Enzyme.autodiff(
-        Forward, gges_oop_loss, BatchDuplicated,
-        BatchDuplicated(A, A_tans), BatchDuplicated(B, B_tans), Const(crit),
-    )
     Enzyme.autodiff(
         Forward, ordqz_oop_loss, BatchDuplicated,
         BatchDuplicated(A, A_tans), BatchDuplicated(B, B_tans), Const(thr),
@@ -259,7 +213,6 @@ end
 
 for p in (ordqz_small_problem(), ordqz_medium_problem())
     _warmup_ordqz(p)
-    _warmup_gges(p)
     _warmup_qz_oop_heap(p)
 end
 _warmup_qz_oop_static(ordqz_static_problem())

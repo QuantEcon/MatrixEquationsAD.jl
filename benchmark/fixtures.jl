@@ -14,6 +14,8 @@ using Random: MersenneTwister, randn
 using StaticArrays: SMatrix
 
 include(joinpath(@__DIR__, "..", "test", "ordqz_fixtures.jl"))
+include(joinpath(@__DIR__, "..", "test", "dsge_qz_fixtures.jl"))
+include(joinpath(@__DIR__, "..", "test", "fvgq_ordqz_fixture.jl"))
 include(joinpath(@__DIR__, "_sgu_raw.jl"))
 
 const BENCH_TANGENT_LANES = 4
@@ -167,6 +169,41 @@ function ordqz_medium_problem()
     dA_lanes = _lanes(rng, size(A))
     dB_lanes = _lanes(rng, size(B))
     return (; A, B, sdim, threshold, dA_lanes, dB_lanes)
+end
+
+# ------------------------------------------------------------------
+# klein_map (heap + static)
+# ------------------------------------------------------------------
+
+const klein_threshold = dp_ordqz_threshold
+
+function klein_small_problem()
+    A, B, n_x = dp_rbc_first_order_pencil()
+    return (; A, B, n_x, threshold = klein_threshold)
+end
+
+function klein_medium_problem()
+    A, B, n_x = dp_sgu_first_order_pencil()
+    return (; A, B, n_x, threshold = klein_threshold)
+end
+
+function klein_fvgq_problem()
+    A = fvgq_ordqz_problem_A()
+    B = fvgq_ordqz_problem_B()
+    return (; A, B, n_x = 14, threshold = klein_threshold)
+end
+
+function klein_sw07pfeifer_problem()
+    A, B, n_x = dp_sw07pfeifer_first_order_pencil()
+    return (; A, B, n_x, threshold = klein_threshold)
+end
+
+function klein_static_small_problem()
+    A, B, n_x = dp_rbc_first_order_pencil()
+    n = size(A, 1)
+    As = SMatrix{n, n, Float64}(A)
+    Bs = SMatrix{n, n, Float64}(B)
+    return (; A = As, B = Bs, n_x, threshold = klein_threshold)
 end
 
 # Static (SMatrix) fixtures — only the very-small RBC 5×5 ordered-QZ pair.
