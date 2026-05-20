@@ -1,32 +1,12 @@
 # In-place per-block solve. Mv, rhsv are views into a hoisted 8x8 / length-8
 # buffer; we factor in-place with `lu!` and solve in-place with `ldiv!` so the
-# happy path stays alloc-free. When M is singular (e.g. coincident generalized
-# eigenvalues, common in DSGE pencils with many static equations), we
-# Tikhonov-regularize by adding `δI` to M and re-solving. The tangent at a
-# coincident-eigenvalue point isn't unique anyway, so any small regularization
-# that keeps the factorization stable is acceptable.
-function _ordqz_block_solve!(Mv, rhsv, M_save)
-    copyto!(M_save, Mv)
-    Tel = real(eltype(Mv))
+# happy path stays alloc-free. When M is singular (coincident generalized
+# eigenvalues — see issue #2) this throws; the caller is expected to perturb
+# the input A via `regularize_A` to break the coincidence at the problem level.
+function _ordqz_block_solve!(Mv, rhsv)
     F = lu!(Mv; check = false)
-    # Treat as singular if `lu!` failed, or if the smallest pivot is below
-    # √eps (DSGE pencils often produce generalized eigenvalues ≪ machine
-    # epsilon -- treat those as numerically zero).
-    min_pivot = LinearAlgebra.issuccess(F) ? abs(Mv[1, 1]) : zero(Tel)
-    if LinearAlgebra.issuccess(F)
-        @inbounds for i in 2:size(Mv, 1)
-            min_pivot = min(min_pivot, abs(Mv[i, i]))
-        end
-    end
-    if min_pivot > sqrt(eps(Tel))
-        ldiv!(F, rhsv)
-        return rhsv
-    end
-    delta = sqrt(eps(Tel))
-    @inbounds for i in axes(M_save, 1)
-        M_save[i, i] += delta
-    end
-    F = lu!(M_save; check = false)
+    LinearAlgebra.issuccess(F) ||
+        throw(LinearAlgebra.SingularException(F.info))
     ldiv!(F, rhsv)
     return rhsv
 end
@@ -73,7 +53,6 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
 
     # Per-block-pair scratch: blocks are 1 or 2, so n_unknowns ≤ 8.
     M_buf = Matrix{Tel}(undef, 8, 8)
-    M_save = Matrix{Tel}(undef, 8, 8)
     rhs_buf = Vector{Tel}(undef, 8)
 
     mul!(tmp1, transpose(Q), dA)
@@ -108,22 +87,13 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                     rhs_S += OmegaQ[ii, k] * S[k, jj]
                     rhs_T += OmegaQ[ii, k] * T[k, jj]
                 end
-                # Original M = [-S_jj S_ii; -T_jj T_ii]; det(M) = S_ii*T_jj -
-                # S_jj*T_ii vanishes when blocks share a generalized eigenvalue
-                # (including the common DSGE case S_ii ≈ S_jj ≈ 0, where λ ≪ ε
-                # is numerically indistinguishable from zero). Tikhonov-
-                # regularize by adding δ to the diagonal if |det| is below
-                # √eps -- consistent with treating "λ smaller than √eps" as
-                # numerically zero.
+                # M = [-S_jj S_ii; -T_jj T_ii], det = S_ii*T_jj - S_jj*T_ii.
+                # Direct Cramer's rule. If two blocks share a generalized
+                # eigenvalue det = 0 and we get Inf/NaN; the caller should
+                # perturb A via `regularize_A` to break the coincidence.
                 a = -S_jj
                 d = T_ii
-                det = a * d - S_ii * (-T_jj)  # = S_ii*T_jj - S_jj*T_ii
-                if abs(det) <= sqrt(eps(Tel))
-                    delta = sqrt(eps(Tel))
-                    a += delta
-                    d += delta
-                    det = a * d - S_ii * (-T_jj)
-                end
+                det = a * d - S_ii * (-T_jj)
                 inv_det = inv(det)
                 sol_1 = (d * rhs_S - S_ii * rhs_T) * inv_det
                 sol_2 = (a * rhs_T + T_jj * rhs_S) * inv_det
@@ -135,10 +105,10 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
             end
 
             i_range = i_start:(i_start + pi - 1)
+            i_range = i_start:(i_start + pi - 1)
             n_unknowns = 2 * pi * qj
             Mv = view(M_buf, 1:n_unknowns, 1:n_unknowns)
             rhsv = view(rhs_buf, 1:n_unknowns)
-            Msv = view(M_save, 1:n_unknowns, 1:n_unknowns)
             fill!(Mv, zero(Tel))
 
             for (jj_loc, jj) in enumerate(j_range)
@@ -173,7 +143,7 @@ function ordqz_tangent!(dS, dT, dQ, dZ, S, T, Q, Z, dA, dB)
                 end
             end
 
-            _ordqz_block_solve!(Mv, rhsv, Msv)
+            _ordqz_block_solve!(Mv, rhsv)
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
                     idx = (jj_loc - 1) * pi + ii_loc

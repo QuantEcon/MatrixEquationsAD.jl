@@ -6,8 +6,8 @@ using MatrixEquationsAD
 import Enzyme.EnzymeRules
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
-    DEFAULT_BK_THRESHOLD, _gges!, _gges_ordschur!, _lyapdkr_check!, _ordqz!,
-    _symmetrize_square!, gges, lyapdkr, lyapdkradjointsolve, lyapdkrfactor,
+    DEFAULT_BK_THRESHOLD, _lyapdkr_check!, _ordqz!,
+    _symmetrize_square!, lyapdkr, lyapdkradjointsolve, lyapdkrfactor,
     lyapdkrsolve, ordqz
 using ConcreteStructs: @concrete
 using Enzyme:

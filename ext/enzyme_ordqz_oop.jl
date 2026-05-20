@@ -1,25 +1,8 @@
-# Enzyme rules for the out-of-place gges and ordqz wrappers.
-#
-# Enzyme cannot auto-derive the out-of-place rule from the existing `_gges!` /
-# `_ordqz!` rules (LAPACK's cfunction-based selector and the per-call buffer
-# allocation defeat the LLVM IR pass). These rules forward to the same adjoint
-# kernels (`ordqz_tangent!`, `ordqz_adjoint!`) used by the in-place rules.
+# Enzyme rules for the out-of-place ordqz wrapper. These forward to the same
+# adjoint kernels (`ordqz_tangent!`, `ordqz_adjoint!`) used by the in-place
+# `_ordqz!` rule.
 
-const _GGES_OOP_FLOAT = Union{Float32, Float64}
-const _DEFAULT_GGES_CRITERIUM = (1 - DEFAULT_BK_THRESHOLD)^2
-
-function _oop_qz_run_primal(
-        ::typeof(gges), A::AbstractMatrix{T}, B::AbstractMatrix{T},
-        select::Symbol, criterium,
-    ) where {T}
-    n = size(A, 1)
-    S = Matrix{T}(undef, n, n)
-    Tm = Matrix{T}(undef, n, n)
-    Q = Matrix{T}(undef, n, n)
-    Z = Matrix{T}(undef, n, n)
-    sdim = _gges_ordschur!(S, Tm, Q, Z, A, B, select, criterium).sdim
-    return (S, Tm, Q, Z, sdim)
-end
+const _ORDQZ_OOP_FLOAT = Union{Float32, Float64}
 
 function _oop_qz_run_primal(
         ::typeof(ordqz), A::AbstractMatrix{T}, B::AbstractMatrix{T},
@@ -35,6 +18,14 @@ function _oop_qz_run_primal(
 end
 
 _oop_qz_named(S, T, Q, Z, sdim) = (; S, T, Q, Z, sdim)
+
+function _oop_qz_perturb(A::AbstractMatrix, δ)
+    A_reg = copy(A)
+    @inbounds for i in axes(A_reg, 1)
+        A_reg[i, i] += δ
+    end
+    return A_reg
+end
 
 # Build an output shadow matching the primal NamedTuple shape (mutable matrices
 # downstream code may write tangents into).
@@ -54,11 +45,13 @@ end
 
 function _oop_qz_forward_impl(
         config, F, RT, A, B, select_or_ordering, threshold_or_criterium,
+        regularize_A,
     )
     Tel = eltype(A.val)
     n = size(A.val, 1)
+    Aval = iszero(regularize_A) ? A.val : _oop_qz_perturb(A.val, regularize_A)
     Sv, Tv, Qv, Zv, sdim = _oop_qz_run_primal(
-        F, A.val, B.val, select_or_ordering, threshold_or_criterium,
+        F, Aval, B.val, select_or_ordering, threshold_or_criterium,
     )
     primal = _oop_qz_named(Sv, Tv, Qv, Zv, sdim)
 
@@ -107,26 +100,17 @@ end
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
-        func::Const{typeof(gges)},
-        RT::Type,
-        A::Annotation{<:StridedMatrix{T}},
-        B::Annotation{<:StridedMatrix{T}};
-        select::Symbol = :ed,
-        criterium = _DEFAULT_GGES_CRITERIUM,
-    ) where {T <: _GGES_OOP_FLOAT}
-    return _oop_qz_forward_impl(config, gges, RT, A, B, select, criterium)
-end
-
-function EnzymeRules.forward(
-        config::EnzymeRules.FwdConfig,
         func::Const{typeof(ordqz)},
         RT::Type,
         A::Annotation{<:StridedMatrix{T}},
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const{Symbol} = Const(:bk);
         threshold = DEFAULT_BK_THRESHOLD,
-    ) where {T <: _GGES_OOP_FLOAT}
-    return _oop_qz_forward_impl(config, ordqz, RT, A, B, ordering.val, threshold)
+        regularize_A = 0,
+    ) where {T <: _ORDQZ_OOP_FLOAT}
+    return _oop_qz_forward_impl(
+        config, ordqz, RT, A, B, ordering.val, threshold, regularize_A,
+    )
 end
 
 # ----------------------------------------------------------------------------
@@ -135,11 +119,13 @@ end
 
 function _oop_qz_augmented_impl(
         config, F, RT, A, B, select_or_ordering, threshold_or_criterium,
+        regularize_A,
     )
     Tel = eltype(A.val)
     n = size(A.val, 1)
+    Aval = iszero(regularize_A) ? A.val : _oop_qz_perturb(A.val, regularize_A)
     Sv, Tv, Qv, Zv, sdim = _oop_qz_run_primal(
-        F, A.val, B.val, select_or_ordering, threshold_or_criterium,
+        F, Aval, B.val, select_or_ordering, threshold_or_criterium,
     )
     primal = _oop_qz_named(Sv, Tv, Qv, Zv, sdim)
 
@@ -165,26 +151,17 @@ end
 
 function EnzymeRules.augmented_primal(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(gges)},
-        RT::Type,
-        A::Annotation{<:StridedMatrix{T}},
-        B::Annotation{<:StridedMatrix{T}};
-        select::Symbol = :ed,
-        criterium = _DEFAULT_GGES_CRITERIUM,
-    ) where {T <: _GGES_OOP_FLOAT}
-    return _oop_qz_augmented_impl(config, gges, RT, A, B, select, criterium)
-end
-
-function EnzymeRules.augmented_primal(
-        config::EnzymeRules.RevConfig,
         func::Const{typeof(ordqz)},
         RT::Type,
         A::Annotation{<:StridedMatrix{T}},
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const{Symbol} = Const(:bk);
         threshold = DEFAULT_BK_THRESHOLD,
-    ) where {T <: _GGES_OOP_FLOAT}
-    return _oop_qz_augmented_impl(config, ordqz, RT, A, B, ordering.val, threshold)
+        regularize_A = 0,
+    ) where {T <: _ORDQZ_OOP_FLOAT}
+    return _oop_qz_augmented_impl(
+        config, ordqz, RT, A, B, ordering.val, threshold, regularize_A,
+    )
 end
 
 function _oop_qz_reverse_impl(config, A, B, tape)
@@ -217,20 +194,6 @@ end
 
 function EnzymeRules.reverse(
         config::EnzymeRules.RevConfig,
-        func::Const{typeof(gges)},
-        RT::Type,
-        tape,
-        A::Annotation{<:StridedMatrix{T}},
-        B::Annotation{<:StridedMatrix{T}};
-        select::Symbol = :ed,
-        criterium = _DEFAULT_GGES_CRITERIUM,
-    ) where {T <: _GGES_OOP_FLOAT}
-    _oop_qz_reverse_impl(config, A, B, tape)
-    return (nothing, nothing)
-end
-
-function EnzymeRules.reverse(
-        config::EnzymeRules.RevConfig,
         func::Const{typeof(ordqz)},
         RT::Type,
         tape,
@@ -238,7 +201,8 @@ function EnzymeRules.reverse(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const{Symbol} = Const(:bk);
         threshold = DEFAULT_BK_THRESHOLD,
-    ) where {T <: _GGES_OOP_FLOAT}
+        regularize_A = 0,
+    ) where {T <: _ORDQZ_OOP_FLOAT}
     _oop_qz_reverse_impl(config, A, B, tape)
     return (nothing, nothing, nothing)
 end

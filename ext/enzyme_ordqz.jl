@@ -13,7 +13,7 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
 
     # Per-block-pair scratch hoisted out of the inner loop (blocks ≤ 2 each).
     M_buf = Matrix{Tel}(undef, 8, 8)
-    M_save = Matrix{Tel}(undef, 8, 8)
+    Mt_buf = Matrix{Tel}(undef, 8, 8)
     bar_x_buf = Vector{Tel}(undef, 8)
 
     @inbounds for j in 1:n, i in 1:n
@@ -61,8 +61,8 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
             i_range = i_start:(i_start + pi - 1)
             n_unknowns = 2 * pi * qj
             Mv = view(M_buf, 1:n_unknowns, 1:n_unknowns)
+            Mtv = view(Mt_buf, 1:n_unknowns, 1:n_unknowns)
             bar_x = view(bar_x_buf, 1:n_unknowns)
-            Msv = view(M_save, 1:n_unknowns, 1:n_unknowns)
             fill!(Mv, zero(Tel))
 
             for (jj_loc, jj) in enumerate(j_range)
@@ -90,11 +90,9 @@ function ordqz_adjoint!(dA, dB, S, T, Q, Z, dS, dT, dQ, dZ)
                 end
             end
 
-            # Solve transpose(M) * bar_rhs = bar_x. Stage transpose into Mv
-            # in-place (it's square) so the in-place LU/solve still applies.
-            transpose!(Msv, Mv)
-            copyto!(Mv, Msv)
-            _ordqz_block_solve!(Mv, bar_x, Msv)
+            # Solve transpose(M) * bar_rhs = bar_x.
+            transpose!(Mtv, Mv)
+            _ordqz_block_solve!(Mtv, bar_x)
             bar_rhs = bar_x
             for (jj_loc, jj) in enumerate(j_range)
                 for (ii_loc, ii) in enumerate(i_range)
@@ -144,13 +142,6 @@ function ordered_qz_rule_primal!(
     return func.val(S, Targ, Q, Z, A, B, ordering, threshold)
 end
 
-function ordered_qz_rule_primal!(
-        ::Const{typeof(_gges!)},
-        S, Targ, Q, Z, A, B, ordering, threshold
-    )
-    return _gges_ordschur!(S, Targ, Q, Z, A, B, ordering, threshold)
-end
-
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
         func::Const{F},
@@ -163,7 +154,7 @@ function EnzymeRules.forward(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
+    ) where {F <: typeof(_ordqz!), T <: Union{Float32, Float64}}
     primal = ordered_qz_rule_primal!(
         func,
         S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
@@ -172,13 +163,13 @@ function EnzymeRules.forward(
     # NOTE: the tangent loop must run whenever any of the input/output args has
     # a Duplicated/BatchDuplicated annotation -- _not_ gated on
     # EnzymeRules.needs_shadow(config), which queries the return-value shadow.
-    # _ordqz!/_gges! return an Int (sdim), so the return is always Const and
+    # _ordqz! returns an Int (sdim), so the return is always Const and
     # needs_shadow is false; that previously caused the rule to silently skip
     # tangent propagation through the mutated S/T/Q/Z buffers.
     any_dup = !(
         typeof(S) <: Const && typeof(Targ) <: Const &&
-        typeof(Q) <: Const && typeof(Z) <: Const &&
-        typeof(A) <: Const && typeof(B) <: Const
+            typeof(Q) <: Const && typeof(Z) <: Const &&
+            typeof(A) <: Const && typeof(B) <: Const
     )
     if any_dup
         N = EnzymeRules.width(config)
@@ -252,7 +243,7 @@ function EnzymeRules.augmented_primal(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
+    ) where {F <: typeof(_ordqz!), T <: Union{Float32, Float64}}
     primal = ordered_qz_rule_primal!(
         func,
         S.val, Targ.val, Q.val, Z.val, A.val, B.val, ordering.val, threshold.val
@@ -275,7 +266,7 @@ function EnzymeRules.reverse(
         B::Annotation{<:StridedMatrix{T}},
         ordering::Const,
         threshold::Const
-    ) where {F <: Union{typeof(_ordqz!), typeof(_gges!)}, T <: Union{Float32, Float64}}
+    ) where {F <: typeof(_ordqz!), T <: Union{Float32, Float64}}
     Sv, Tv, Qv, Zv = tape
     N = EnzymeRules.width(config)
 

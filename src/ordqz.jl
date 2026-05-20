@@ -22,7 +22,7 @@ end
 
 function ordqz(
         A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol = :bk;
-        threshold = DEFAULT_BK_THRESHOLD
+        threshold = DEFAULT_BK_THRESHOLD, regularize_A = 0,
     )
     n = checksquare(A)
     checksquare(B) == n ||
@@ -32,16 +32,31 @@ function ordqz(
     T = Matrix{Tel}(undef, n, n)
     Q = Matrix{Tel}(undef, n, n)
     Z = Matrix{Tel}(undef, n, n)
-    sdim = ordqz!(S, T, Q, Z, A, B, ordering; threshold)
+    sdim = ordqz!(S, T, Q, Z, A, B, ordering; threshold, regularize_A)
     return (; S, T, Q, Z, sdim)
 end
 
 function ordqz!(
         S::AbstractMatrix, T::AbstractMatrix, Q::AbstractMatrix, Z::AbstractMatrix,
         A::AbstractMatrix, B::AbstractMatrix, ordering::Symbol = :bk;
-        threshold = DEFAULT_BK_THRESHOLD
+        threshold = DEFAULT_BK_THRESHOLD, regularize_A = 0,
     )
-    return _ordqz!(S, T, Q, Z, A, B, ordering, threshold)
+    # Regularization semantics: a positive `regularize_A` factors
+    # (A + regularize_A·I, B), which breaks coincident generalized eigenvalues
+    # at the problem level so the tangent is smooth.
+    if iszero(regularize_A)
+        return _ordqz!(S, T, Q, Z, A, B, ordering, threshold)
+    end
+    A_reg = _ordqz_regularize_diagonal(A, regularize_A)
+    return _ordqz!(S, T, Q, Z, A_reg, B, ordering, threshold)
+end
+
+function _ordqz_regularize_diagonal(A::AbstractMatrix, δ)
+    A_reg = copy(A)
+    @inbounds for i in axes(A_reg, 1)
+        A_reg[i, i] += δ
+    end
+    return A_reg
 end
 
 function _ordqz!(

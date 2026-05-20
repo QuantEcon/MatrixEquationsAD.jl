@@ -70,7 +70,9 @@ autodiff(
 )
 ```
 
-Use the exported ordered-QZ wrapper for a Blanchard-Kahn check:
+Use the exported `ordqz` wrapper for a Blanchard-Kahn check. The package
+builds on `LinearAlgebra.schur` + `ordschur!` under the hood — there is no
+LAPACK-specific shim.
 
 ```julia
 using MatrixEquationsAD
@@ -80,9 +82,7 @@ B = [1.0 0.1 0.0; 0.0 1.2 0.2; 0.0 0.0 0.8]
 
 eps_BK = 1.0e-6
 n_unstable_expected = 2
-(; S, T, Q, Z, sdim) = gges(A, B;
-    select = :ed, criterium = (1 - eps_BK)^2
-)
+(; S, T, Q, Z, sdim) = ordqz(A, B, :bk; threshold = eps_BK)
 sdim == n_unstable_expected ||
     error("Blanchard-Kahn condition failed")
 

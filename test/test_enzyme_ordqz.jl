@@ -29,22 +29,6 @@ function ordqz_reverse_reconstruction_sum(A, B)::Float64
     return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
 end
 
-function gges_enzyme_sum!(S, T, Q, Z, A, B)::Float64
-    result = gges!(S, T, Q, Z, A, B; select = :ed, criterium = (1 - 1.0e-6)^2)
-    scale = result.sdim == 2 ? 1.0 : -1.0
-    return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
-end
-
-function gges_reverse_reconstruction_sum(A, B)::Float64
-    S = zero(A)
-    T = zero(B)
-    Q = zero(A)
-    Z = zero(A)
-    result = gges!(S, T, Q, Z, A, B; select = :ed, criterium = (1 - 1.0e-6)^2)
-    scale = result.sdim == 2 ? 1.0 : -1.0
-    return scale * (sum(abs2, Q * S * Z') + 0.7 * sum(abs2, Q * T * Z'))
-end
-
 @testset "ordqz Enzyme rules" begin
     A, B = ordqz_enzyme_problem()
 
@@ -67,33 +51,6 @@ end
     )
     test_reverse(
         ordqz_reverse_reconstruction_sum, Active,
-        (copy(A), Duplicated), (copy(B), Const);
-        rng = Random.MersenneTwister(1234), fdm = ordqz_fdm
-    )
-end
-
-@testset "gges Enzyme rules" begin
-    A, B = ordqz_enzyme_problem()
-
-    test_forward(
-        gges_enzyme_sum!, Const,
-        (zero(A), Duplicated), (zero(B), Duplicated), (zero(A), Duplicated),
-        (zero(A), Duplicated), (copy(A), Duplicated), (copy(B), Duplicated);
-        rng = Random.MersenneTwister(1234), fdm = ordqz_fdm
-    )
-    test_forward(
-        gges_enzyme_sum!, Const,
-        (zero(A), BatchDuplicated), (zero(B), BatchDuplicated), (zero(A), BatchDuplicated),
-        (zero(A), BatchDuplicated), (copy(A), BatchDuplicated), (copy(B), BatchDuplicated);
-        rng = Random.MersenneTwister(1234), fdm = ordqz_fdm
-    )
-    test_reverse(
-        gges_reverse_reconstruction_sum, Active,
-        (copy(A), Duplicated), (copy(B), Duplicated);
-        rng = Random.MersenneTwister(1234), fdm = ordqz_fdm
-    )
-    test_reverse(
-        gges_reverse_reconstruction_sum, Active,
         (copy(A), Duplicated), (copy(B), Const);
         rng = Random.MersenneTwister(1234), fdm = ordqz_fdm
     )

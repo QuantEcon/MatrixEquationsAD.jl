@@ -8,7 +8,6 @@ using Test
     include("riccati_fixtures.jl")
     include("test_lyapdkr.jl")
     include("test_ordqz.jl")
-    include("test_gges.jl")
     include("test_enzyme_dlyap.jl")
     include("test_enzyme_lyapdkr.jl")
     include("test_enzyme_riccati.jl")
@@ -21,7 +20,7 @@ using Test
     include("test_forwarddiff_sylvester.jl")
     include("test_forwarddiff_sylvkr.jl")
     include("test_forwarddiff_ordqz.jl")
-    include("test_forwarddiff_gges.jl")
-    include("test_oop_gges_ordqz.jl")
+    include("test_oop_ordqz.jl")
     include("test_fvgq_ordqz.jl")
+    include("test_dsge_qz_ad.jl")
 end

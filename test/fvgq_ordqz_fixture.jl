@@ -1,6 +1,6 @@
 # 38x38 FVGQ-style generalized eigenproblem extracted from
 # https://github.com/QuantEcon/MatrixEquationsAD.jl/issues/2 .
-# Primal gges!/ordqz! succeed; the ForwardDiff Dual tangent path used to
+# Primal ordqz! succeeds; the ForwardDiff Dual tangent path used to
 # trip a SingularException inside ordqz_tangent! because two off-diagonal
 # blocks had near-coincident generalized eigenvalues.
 
