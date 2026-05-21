@@ -270,18 +270,7 @@ function klein_map_oop_static_group(problem)
         n_x = Val($(problem.n_x))
     end evals = 4
 
-    g["enzyme_reverse"] = @benchmarkable Enzyme.autodiff(
-        Reverse, klein_map_oop_loss, Active,
-        Active(A), Active(B), Const(Wg), Const(Wh), Const(threshold),
-        Const(n_x),
-    ) setup = begin
-        A = $(problem.A)
-        B = $(problem.B)
-        Wg = $(problem.Wg)
-        Wh = $(problem.Wh)
-        threshold = $(problem.threshold)
-        n_x = Val($(problem.n_x))
-    end evals = 4
+    # Static reverse needs dedicated coverage before it belongs in this benchmark.
 
     return g
 end

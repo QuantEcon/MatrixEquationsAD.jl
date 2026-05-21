@@ -30,7 +30,7 @@ end
 function lyapdkr(
         A::SMatrix{n, n, T}, C::SMatrix{n, n, T};
         tol_diag::Real = Inf, check_psd::Bool = false,
-    ) where {n, T <: Union{Float32, Float64}}
+    ) where {n, T}
     X = MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C); tol_diag, check_psd)
     return SMatrix{n, n, T}(X)
 end

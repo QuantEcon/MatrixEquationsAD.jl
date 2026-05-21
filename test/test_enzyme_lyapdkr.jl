@@ -4,6 +4,7 @@ using EnzymeTestUtils: test_forward, test_reverse
 using LinearAlgebra: dot, issymmetric
 using MatrixEquations
 using MatrixEquationsAD
+using StaticArrays: SMatrix
 using Test
 
 function lyapdkr_weighted_sum(A, C, W)::Float64
@@ -16,6 +17,9 @@ end
     C = [1.0 0.2; 0.2 0.7]
     W = [0.3 -0.1; 0.2 0.5]
     X = lyapdkr(A, C)
+    As = SMatrix{2, 2, Float64}(A)
+    Cs = SMatrix{2, 2, Float64}(C)
+    Ws = SMatrix{2, 2, Float64}(W)
 
     @test X ≈ lyapd(A, C)
     @test issymmetric(X)
@@ -32,5 +36,10 @@ end
     test_reverse(
         lyapdkr_weighted_sum, Active,
         (A, Duplicated), (C, Duplicated), (W, Const)
+    )
+
+    test_forward(
+        lyapdkr_weighted_sum, BatchDuplicated,
+        (As, BatchDuplicated), (Cs, BatchDuplicated), (Ws, Const)
     )
 end
