@@ -10,16 +10,15 @@ using LinearAlgebra:
 
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
-    DEFAULT_BK_THRESHOLD, _lyapdkr_check!, _ordqz!,
-    _symmetrize_square!, lyapdkr, lyapdkrfactor, lyapdkrsolve, ordqz
+    _lyapdkr_check!, _symmetrize_square!, klein_map, klein_map!, lyapdkr,
+    lyapdkrfactor, lyapdkrsolve
 
 include("forwarddiff_lyapunov.jl")
 include("forwarddiff_lyapdkr.jl")
 include("riccati_derivatives.jl")
 include("forwarddiff_riccati.jl")
 include("forwarddiff_sylvester.jl")
-include("ordqz_derivatives.jl")
-include("forwarddiff_ordqz.jl")
-include("forwarddiff_qz_oop.jl")
+include("klein_map_derivatives.jl")
+include("forwarddiff_klein_map.jl")
 
 end

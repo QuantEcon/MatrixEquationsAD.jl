@@ -4,7 +4,7 @@
 
 Automatic differentiation support for selected
 [`MatrixEquations.jl`](https://github.com/andreasvarga/MatrixEquations.jl)
-functions, plus ordered-QZ helpers while those APIs are not available upstream.
+functions, plus Klein policy-map extraction and AD for first-order DSGE gschur inputs.
 The implemented AD formulas are documented in [DERIVATIONS.md](DERIVATIONS.md).
 
 ```julia
@@ -70,21 +70,28 @@ autodiff(
 )
 ```
 
-Use the exported `ordqz` wrapper for a Blanchard-Kahn check. The package
-builds on `LinearAlgebra.schur` + `ordschur!` under the hood — there is no
-LAPACK-specific shim.
+Extract a Klein policy map from a first-order gschur input:
 
 ```julia
+using LinearAlgebra: I, norm
 using MatrixEquationsAD
 
-A = [1.6 0.2 0.1; 0.0 0.35 -0.1; 0.0 0.0 1.9]
-B = [1.0 0.1 0.0; 0.0 1.2 0.2; 0.0 0.0 0.8]
+A = [
+    0.00012263591151906127 -0.011623494029190608 0.028377570562199094 0.0 0.0;
+    1.0 0.0 0.0 0.0 0.0;
+    0.0 0.0 0.0 0.0 0.0;
+    0.0 1.0 0.0 0.0 0.0;
+    -1.0 0.0 0.0 0.0 0.0
+]
+B = [
+    0.0 0.0 -0.028377570562199098 0.0 0.0;
+    -0.98 0.0 1.0 -1.0 0.0;
+    -0.07263157894736837 -6.884057971014498 0.0 1.0 0.0;
+    0.0 -0.2 0.0 0.0 0.0;
+    0.98 0.0 0.0 0.0 1.0
+]
 
-eps_BK = 1.0e-6
-n_unstable_expected = 2
-(; S, T, Q, Z, sdim) = ordqz(A, B, :bk; threshold = eps_BK)
-sdim == n_unstable_expected ||
-    error("Blanchard-Kahn condition failed")
-
-S, T, Q, Z
+r = klein_map(A, B; threshold = 1.0e-6)
+G = vcat(Matrix{Float64}(I, size(r.h_x, 1), size(r.h_x, 1)), r.g_x)
+norm(A * G * r.h_x + B * G)
 ```

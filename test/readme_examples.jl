@@ -1,6 +1,6 @@
 using Enzyme: Active, Const, Duplicated, Reverse, autodiff, make_zero
 using ForwardDiff
-using LinearAlgebra: dot
+using LinearAlgebra: I, dot, norm
 using MatrixEquations
 using MatrixEquationsAD
 using Test
@@ -58,18 +58,26 @@ end
         @test any(!iszero, dE)
     end
 
-    @testset "ordqz wrapper" begin
-        A = [1.6 0.2 0.1; 0.0 0.35 -0.1; 0.0 0.0 1.9]
-        B = [1.0 0.1 0.0; 0.0 1.2 0.2; 0.0 0.0 0.8]
+    @testset "klein_map" begin
+        A = [
+            0.00012263591151906127 -0.011623494029190608 0.028377570562199094 0.0 0.0;
+            1.0 0.0 0.0 0.0 0.0;
+            0.0 0.0 0.0 0.0 0.0;
+            0.0 1.0 0.0 0.0 0.0;
+            -1.0 0.0 0.0 0.0 0.0
+        ]
+        B = [
+            0.0 0.0 -0.028377570562199098 0.0 0.0;
+            -0.98 0.0 1.0 -1.0 0.0;
+            -0.07263157894736837 -6.884057971014498 0.0 1.0 0.0;
+            0.0 -0.2 0.0 0.0 0.0;
+            0.98 0.0 0.0 0.0 1.0
+        ]
 
-        eps_BK = 1.0e-6
-        n_unstable_expected = 2
-        (; S, T, Q, Z, sdim) = ordqz(A, B, :bk; threshold = eps_BK)
-        sdim == n_unstable_expected ||
-            error("Blanchard-Kahn condition failed")
-
-        @test sdim == 2
-        @test A ≈ Q * S * Z'
-        @test B ≈ Q * T * Z'
+        r = klein_map(A, B; threshold = 1.0e-6)
+        G = vcat(Matrix{Float64}(I, size(r.h_x, 1), size(r.h_x, 1)), r.g_x)
+        @test size(r.h_x) == (2, 2)
+        @test size(r.g_x) == (3, 2)
+        @test norm(A * G * r.h_x + B * G) <= 1.0e-8
     end
 end

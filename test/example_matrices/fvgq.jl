@@ -1,10 +1,12 @@
-# 38x38 FVGQ-style generalized eigenproblem extracted from
-# https://github.com/QuantEcon/MatrixEquationsAD.jl/issues/2 .
-# Primal ordqz! succeeds; the ForwardDiff Dual tangent path used to
-# trip a SingularException inside ordqz_tangent! because two off-diagonal
-# blocks had near-coincident generalized eigenvalues.
+module FVGQExampleMatrices
 
-function fvgq_ordqz_problem_A()
+export fvgq_klein_gschur_A, fvgq_klein_gschur_B
+
+# 38x38 FVGQ-style Klein gschur input extracted from
+# https://github.com/QuantEcon/MatrixEquationsAD.jl/issues/2 .
+# This gschur input is retained as a larger primal/residual fixture for klein_map.
+
+function fvgq_klein_gschur_A()
     return [
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -34.450841666958645 0.0 0.0 0.0 0.0 0.0 1231.485162098844 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 999.7920052276011 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
@@ -47,7 +49,7 @@ function fvgq_ordqz_problem_A()
     ]
 end
 
-function fvgq_ordqz_problem_B()
+function fvgq_klein_gschur_B()
     return [
         1233.9530682353138 0.0 0.0 0.0 0.0 0.0 0.0 0.0 35.74615604471414 0.0 0.0 0.0 0.0 0.0 -2467.026641473909 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -1.0 -1001.7955964204411 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.439448229295603 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -1.2953143777555085 0.0 0.0 0.0 0.0 0.0 0.0 -1.1112732584578011 0.0 0.0 1.6841544282758554 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
@@ -88,4 +90,6 @@ function fvgq_ordqz_problem_B()
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -0.9966057734548976 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 1.0
     ]
+end
+
 end

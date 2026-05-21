@@ -25,11 +25,10 @@ eigenvalues of `A` has product equal to one.
 | `MatrixEquations.gsylv` | ForwardDiff, Enzyme forward, Enzyme reverse | [`ext/forwarddiff_sylvester.jl`](ext/forwarddiff_sylvester.jl), [`ext/enzyme_sylvester.jl`](ext/enzyme_sylvester.jl) | `X` |
 | `MatrixEquations.gsylvkr` | ForwardDiff, Enzyme forward, Enzyme reverse | [`ext/forwarddiff_sylvester.jl`](ext/forwarddiff_sylvester.jl), [`ext/enzyme_sylvester.jl`](ext/enzyme_sylvester.jl) | `X` |
 | `MatrixEquations.ared` | ForwardDiff, Enzyme forward, Enzyme reverse | [`ext/forwarddiff_riccati.jl`](ext/forwarddiff_riccati.jl), [`ext/enzyme_riccati.jl`](ext/enzyme_riccati.jl), [`ext/riccati_derivatives.jl`](ext/riccati_derivatives.jl) | `X`, `F` |
-| `MatrixEquationsAD.ordqz!` / `_ordqz!` | ForwardDiff, Enzyme forward, Enzyme reverse | [`ext/forwarddiff_ordqz.jl`](ext/forwarddiff_ordqz.jl), [`ext/enzyme_ordqz.jl`](ext/enzyme_ordqz.jl), [`ext/ordqz_derivatives.jl`](ext/ordqz_derivatives.jl) | `S`, `T`, `Q`, `Z` |
+| `MatrixEquationsAD.klein_map` / `klein_map!` | ForwardDiff, Enzyme forward, Enzyme reverse | [`ext/forwarddiff_klein_map.jl`](ext/forwarddiff_klein_map.jl), [`ext/enzyme_klein_map.jl`](ext/enzyme_klein_map.jl), [`ext/klein_map_derivatives.jl`](ext/klein_map_derivatives.jl) | `g_x`, `h_x` |
 
-The public out-of-place `ordqz(A, B, ordering; threshold)` is a primal
-convenience wrapper. The custom AD rules are for the mutating path that writes
-`S`, `T`, `Q`, and `Z`.
+The policy-map AD path differentiates the graph-normalized Klein equation
+instead of raw generalized-Schur factors.
 
 ## Discrete Lyapunov
 
@@ -216,7 +215,7 @@ and
 
 The `gsylv` rule reuses a generalized-Schur cache for the primal solve and all
 tangent or reverse solves. These formulas assume the generalized Sylvester
-operator is nonsingular. Equivalently, MatrixEquations.jl requires the pencils
+operator is nonsingular. Equivalently, MatrixEquations.jl requires the operator pairs
 `A - lambda C` and `D + lambda B` to be regular and to have no common
 eigenvalues.
 
@@ -411,87 +410,118 @@ References:
 - Kao and Hennequin derive AD rules for algebraic Riccati equations in
   [arXiv:2011.11430](https://arxiv.org/abs/2011.11430).
 
-## Ordered QZ
+## Klein Map
 
-`MatrixEquationsAD.ordqz!` computes an ordered real generalized Schur
-factorization
+`MatrixEquationsAD.klein_map(A, B)` and `klein_map!(g_x, h_x, A, B)` use
+ordered generalized-Schur factors for the primal policy extraction. The AD
+rules do not differentiate those factors. They instead hold the selected stable block locally fixed and
+differentiate the graph-normalized policy equation
 
 ```math
-A = Q S Z^\top,
+A G h + B G = 0,
 \qquad
-B = Q T Z^\top,
+G =
+\begin{bmatrix}
+I \\
+g
+\end{bmatrix}.
 ```
 
-where `Q` and `Z` are orthogonal, `S` is quasi-upper triangular, and `T` is
-upper triangular. The currently supported ordering symbol is `:bk`, which
-moves generalized eigenvalues satisfying
+Let
 
 ```math
-|\alpha_i|^2 \ge (1 - \tau)^2 |\beta_i|^2,
-```
-
-where `\tau` is the `threshold` keyword. The returned `sdim` is the number of
-selected eigenvalues in the leading block and is non-differentiable. The
-threshold is treated as a constant margin; the derivative assumes no eigenvalue
-crosses the selection boundary.
-
-The derivative is local to a fixed ordering and fixed real-Schur block
-structure. The implementation detects two-by-two real-Schur blocks using the
-fixed cutoff `abs(S[i + 1, i]) > 1e-14`. Define
-
-```math
-E = Q^\top \Delta A Z,
+E_y =
+\begin{bmatrix}
+0 \\
+I
+\end{bmatrix},
 \qquad
-H = Q^\top \Delta B Z,
+M = A G,
+\qquad
+N = A E_y,
+\qquad
+P = B E_y.
 ```
 
-and skew-symmetric matrices
+For perturbations of `A` and `B`, the tangent equation is
 
 ```math
-\Omega_Q = Q^\top \Delta Q,
-\qquad
-\Omega_Z = Z^\top \Delta Z.
+M \Delta h + N \Delta g h + P \Delta g
+    =
+    -\Delta A G h - \Delta B G.
 ```
 
-The skew-symmetry follows from differentiating `Q^\top Q = I` and
-`Z^\top Z = I`.
-The implementation fixes a gauge by leaving the block-diagonal entries of
-`\Omega_Q` and `\Omega_Z` at zero and solving only off-diagonal block entries.
-
-Differentiating the factorizations gives
+The out-of-place rule stacks the unknowns and solves one dense linear system.
+With column-major vectorization,
 
 ```math
-\Delta S = E - \Omega_Q S + S\Omega_Z,
-\qquad
-\Delta T = H - \Omega_Q T + T\Omega_Z.
+\left[
+I \otimes M
+\quad
+h^\top \otimes N + I \otimes P
+\right]
+\begin{bmatrix}
+\operatorname{vec}(\Delta h) \\
+\operatorname{vec}(\Delta g)
+\end{bmatrix}
+=
+\operatorname{vec}(-\Delta A G h - \Delta B G).
 ```
 
-The lower off-block entries of `\Delta S` and the strictly lower entries of
-`\Delta T` must be zero to preserve generalized Schur form. The implementation
-solves the resulting small block generalized Sylvester systems in a
-block-triangular sweep for the off-diagonal entries of `\Omega_Q` and
-`\Omega_Z`, then returns
+Reverse mode solves the transposed dense system for `\Lambda`:
 
 ```math
-\Delta Q = Q\Omega_Q,
-\qquad
-\Delta Z = Z\Omega_Z.
+K^\top \operatorname{vec}(\Lambda)
+    =
+\begin{bmatrix}
+\operatorname{vec}(\bar h) \\
+\operatorname{vec}(\bar g)
+\end{bmatrix},
 ```
 
-The reverse rule back-propagates through the same triangular dependence in the
-opposite sweep order. After propagating cotangents through `S`, `T`, `Q`, and
-`Z`, it ends with
+then accumulates
 
 ```math
-\bar A \mathrel{+}= Q \bar E Z^\top,
+\bar A \mathrel{+}= -\Lambda h^\top G^\top,
 \qquad
-\bar B \mathrel{+}= Q \bar H Z^\top.
+\bar B \mathrel{+}= -\Lambda G^\top.
 ```
 
-The rule is not valid across eigenvalue selection changes, changes in
-one-by-one versus two-by-two block structure, repeated or nearly coincident
-generalized eigenvalues, or threshold crossings. In Enzyme, `ordering` and
-`threshold` are passed as `Const`.
+The in-place rule uses the same equation but avoids forming `K`. Define
+
+```math
+C_0 = [M \quad P],
+\qquad
+J = C_0^{-1}N,
+\qquad
+Y = C_0^{-1}(-\Delta A G h - \Delta B G).
+```
+
+Partition `J = [J_x; J_y]` and `Y = [Y_x; Y_y]`. The lower block is the
+discrete Sylvester equation
+
+```math
+J_y \Delta g h + \Delta g = Y_y,
+```
+
+and then
+
+```math
+\Delta h = Y_x - J_x \Delta g h.
+```
+
+The reverse in-place rule first solves the adjoint discrete Sylvester equation
+for `Z`,
+
+```math
+J_y^\top Z h^\top + Z = \bar g - J_x^\top \bar h h^\top,
+```
+
+then uses `[ \bar h ; Z ]` as the cotangent of `Y` and applies the same
+parameter cotangents as the dense rule.
+
+The rules are not valid across eigenvalue selection changes or threshold
+crossings. In Enzyme, `threshold` is passed as `Const`.
 
 References:
 
@@ -506,6 +536,6 @@ References:
 - Blanchard and Kahn's rational-expectations conditions motivate the `:bk`
   ordering used for unstable generalized eigenvalues:
   [DOI:10.2307/1912186](https://doi.org/10.2307/1912186).
-- Sims discusses QZ/generalized-Schur methods for linear rational-expectations
+- Sims discusses generalized-Schur methods for linear rational-expectations
   models:
   [DOI:10.1023/A:1020517101123](https://doi.org/10.1023/A:1020517101123).

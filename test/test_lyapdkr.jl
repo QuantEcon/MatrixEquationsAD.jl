@@ -3,15 +3,10 @@ using MatrixEquations
 using MatrixEquationsAD
 using Test
 
-function lyapdkr_problem()
+@testset "lyapdkr primal" begin
     A = [0.55 0.08; -0.04 0.42]
     C = [1.0 0.2; 0.2 0.7]
-    return A, C
-end
-
-@testset "lyapdkr primal" begin
-    A, C = lyapdkr_problem()
-    X = @inferred lyapdkr(A, C)
+    X = lyapdkr(A, C)
 
     @test X ≈ lyapd(A, C)
     @test issymmetric(X)

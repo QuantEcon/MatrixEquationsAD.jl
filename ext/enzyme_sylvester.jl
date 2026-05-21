@@ -1,4 +1,4 @@
-@concrete struct GSylvQZCache
+@concrete struct GSylvSchurCache
     AS
     BS
     CS
@@ -15,10 +15,10 @@ function gsylvfactor(
     ) where {T <: Union{Float32, Float64}}
     AS, CS, Q1, Z1 = schur(A, C)
     BS, DS, Q2, Z2 = schur(B, D)
-    return GSylvQZCache(AS, BS, CS, DS, Q1, Z1, Q2, Z2)
+    return GSylvSchurCache(AS, BS, CS, DS, Q1, Z1, Q2, Z2)
 end
 
-function gsylvsolve(cache::GSylvQZCache, E::StridedMatrix{T}) where {T}
+function gsylvsolve(cache::GSylvSchurCache, E::StridedMatrix{T}) where {T}
     rhs = cache.Q1' * E * cache.Z2
     gsylvs!(
         cache.AS, cache.BS, cache.CS, cache.DS, rhs;
@@ -27,7 +27,7 @@ function gsylvsolve(cache::GSylvQZCache, E::StridedMatrix{T}) where {T}
     return cache.Z1 * rhs * cache.Q2'
 end
 
-function gsylvadjointsolve(cache::GSylvQZCache, Xbar::StridedMatrix{T}) where {T}
+function gsylvadjointsolve(cache::GSylvSchurCache, Xbar::StridedMatrix{T}) where {T}
     rhs = cache.Z1' * Xbar * cache.Q2
     gsylvs!(
         cache.AS, cache.BS, cache.CS, cache.DS, rhs;

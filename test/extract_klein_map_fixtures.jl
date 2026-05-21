@@ -1,15 +1,15 @@
 # Regenerate test/klein_map_fixtures.jl (and, idempotently, append
-# dp_sw07pfeifer_first_order_pencil() to test/dsge_qz_fixtures.jl):
+# dp_sw07pfeifer_first_order_gschur() to test/example_matrices/sw07.jl):
 #
 #   julia --project=<DP project> test/extract_klein_map_fixtures.jl
 #
 # This is a generator script — it is NOT included in runtests.jl. It depends
 # on DifferentiablePerturbation.jl (DP) for two reasons:
 #   1. ground-truth (g_x, h_x) computation via DP's first_order_perturbation!
-#   2. materializing the SW07Pfeifer pencil (we don't carry DP's symbolic
+#   2. materializing the SW07Pfeifer gschur input (we don't carry DP's symbolic
 #      assembly machinery in this repo)
 #
-# Cross-validation gate: after computing (g_x, h_x) on each pencil, the
+# Cross-validation gate: after computing (g_x, h_x) on each gschur input, the
 # generator checks DP's published anchor values for RBC_SV (DP
 # test/first_order_perturbation.jl:138-152, 10 spot-checks at atol=1e-10)
 # and SW07 (DP test/sw07/sw07_model.jl:64-75, 10 spot-checks at atol=1e-10).
@@ -21,11 +21,16 @@ using LinearAlgebra: I, norm
 using Printf
 
 const REPO_DIR = normpath(joinpath(@__DIR__, ".."))
-const PENCIL_FILE = joinpath(REPO_DIR, "test", "dsge_qz_fixtures.jl")
+const EXAMPLE_MATRIX_DIR = joinpath(REPO_DIR, "test", "example_matrices")
+const RBC_FILE = joinpath(EXAMPLE_MATRIX_DIR, "rbc.jl")
+const SGU_FILE = joinpath(EXAMPLE_MATRIX_DIR, "sgu.jl")
+const SW07_FILE = joinpath(EXAMPLE_MATRIX_DIR, "sw07.jl")
+const FVGQ_FILE = joinpath(EXAMPLE_MATRIX_DIR, "fvgq.jl")
 const FIXTURE_FILE = joinpath(REPO_DIR, "test", "klein_map_fixtures.jl")
-const FVGQ_FILE = joinpath(REPO_DIR, "test", "fvgq_ordqz_fixture.jl")
 
-include(PENCIL_FILE)
+include(RBC_FILE)
+include(SGU_FILE)
+include(SW07_FILE)
 include(FVGQ_FILE)
 
 # -------------------------------------------------------------------------
@@ -114,7 +119,7 @@ end
 # Pencil capture for SW07Pfeifer (Path A)
 # -------------------------------------------------------------------------
 
-function sw07pfeifer_pencil()
+function sw07pfeifer_gschur()
     n_x = SW07Pfeifer.n_x
     n_y = SW07Pfeifer.n_y
     n_eps = SW07Pfeifer.n_epsilon
@@ -130,7 +135,7 @@ function sw07pfeifer_pencil()
     return (; A, B, n_x)
 end
 
-function sw07_pencil()
+function sw07_gschur()
     n_x = SW07.n_x
     n_y = SW07.n_y
     n_eps = SW07.n_epsilon
@@ -147,7 +152,7 @@ function sw07_pencil()
 end
 
 # -------------------------------------------------------------------------
-# Pretty-print helpers (cloned from test/extract_dsge_qz_ad_fixtures.jl)
+# Pretty-print helpers for committed fixture matrices.
 # -------------------------------------------------------------------------
 
 function _format_float(io::IO, x::Float64)
@@ -196,18 +201,18 @@ function _emit_fixture(io::IO, const_name::Symbol, sol)
 end
 
 # -------------------------------------------------------------------------
-# Idempotent append of dp_sw07pfeifer_first_order_pencil() to dsge_qz_fixtures.jl
+# Idempotent append of dp_sw07pfeifer_first_order_gschur() to sw07.jl
 # -------------------------------------------------------------------------
 
-function append_sw07pfeifer_pencil_if_missing(p)
-    existing = read(PENCIL_FILE, String)
-    if occursin("dp_sw07pfeifer_first_order_pencil", existing)
-        @info "sw07pfeifer pencil already present in dsge_qz_fixtures.jl — skipping append"
+function append_sw07pfeifer_gschur_if_missing(p)
+    existing = read(SW07_FILE, String)
+    if occursin("function dp_sw07pfeifer_first_order_gschur", existing)
+        @info "sw07pfeifer gschur input already present in sw07.jl — skipping append"
         return nothing
     end
-    open(PENCIL_FILE, "a") do io
-        print(io, "\n")
-        print(io, "function dp_sw07pfeifer_first_order_pencil()\n")
+
+    function_text = sprint() do io
+        print(io, "function dp_sw07pfeifer_first_order_gschur()\n")
         print(io, "    A = ")
         _format_matrix(io, p.A; indent = 8)
         print(io, "\n")
@@ -217,7 +222,18 @@ function append_sw07pfeifer_pencil_if_missing(p)
         print(io, "    return A, B, ", p.n_x, "\n")
         print(io, "end\n")
     end
-    @info "Appended dp_sw07pfeifer_first_order_pencil() to" PENCIL_FILE
+
+    final_end = findlast("\nend\n", existing)
+    if final_end === nothing
+        error("Expected module-closing end in $SW07_FILE")
+    end
+    open(SW07_FILE, "w") do io
+        print(io, existing[begin:prevind(existing, first(final_end))])
+        print(io, "\n")
+        print(io, function_text)
+        print(io, existing[first(final_end):end])
+    end
+    @info "Appended dp_sw07pfeifer_first_order_gschur() to" SW07_FILE
     return nothing
 end
 
@@ -228,30 +244,30 @@ end
 function main()
     @info "Computing klein solutions"
 
-    rbc_A, rbc_B, rbc_n_x = dp_rbc_first_order_pencil()
+    rbc_A, rbc_B, rbc_n_x = RBCExampleMatrices.dp_rbc_first_order_gschur()
     sol_rbc = dp_klein_solution(rbc_A, rbc_B, rbc_n_x)
 
-    rbc_sv_A, rbc_sv_B, rbc_sv_n_x = dp_rbc_sv_first_order_pencil()
+    rbc_sv_A, rbc_sv_B, rbc_sv_n_x = RBCExampleMatrices.dp_rbc_sv_first_order_gschur()
     sol_rbc_sv = dp_klein_solution(rbc_sv_A, rbc_sv_B, rbc_sv_n_x)
     check_rbc_sv_anchor(sol_rbc_sv)
 
-    sgu_A, sgu_B, sgu_n_x = dp_sgu_first_order_pencil()
+    sgu_A, sgu_B, sgu_n_x = SGUExampleMatrices.dp_sgu_first_order_gschur()
     sol_sgu = dp_klein_solution(sgu_A, sgu_B, sgu_n_x)
 
-    fvgq_A = fvgq_ordqz_problem_A()
-    fvgq_B = fvgq_ordqz_problem_B()
-    # FVGQ pencil: sdim = 14 from existing test/test_fvgq_ordqz.jl:47
+    fvgq_A = FVGQExampleMatrices.fvgq_klein_gschur_A()
+    fvgq_B = FVGQExampleMatrices.fvgq_klein_gschur_B()
+    # FVGQ gschur input: n_x = 14 for the committed fixture.
     sol_fvgq = dp_klein_solution(fvgq_A, fvgq_B, 14)
 
-    sw07p = sw07pfeifer_pencil()
+    sw07p = sw07pfeifer_gschur()
     sol_sw07p = dp_klein_solution(sw07p.A, sw07p.B, sw07p.n_x)
 
     # Cross-validation anchor: SW07 (not Pfeifer) per plan
-    sw07 = sw07_pencil()
+    sw07 = sw07_gschur()
     sol_sw07 = dp_klein_solution(sw07.A, sw07.B, sw07.n_x)
     check_sw07_anchor(sol_sw07)
 
-    append_sw07pfeifer_pencil_if_missing(sw07p)
+    append_sw07pfeifer_gschur_if_missing(sw07p)
 
     open(FIXTURE_FILE, "w") do io
         print(
@@ -262,9 +278,13 @@ function main()
             #   julia --project=<DP project> test/extract_klein_map_fixtures.jl
             #
             # Ground-truth (g_x, h_x) policy-function matrices for each DSGE
-            # pencil, computed by DifferentiablePerturbation's
+            # gschur input, computed by DifferentiablePerturbation's
             # first_order_perturbation!. Used by test/test_klein_map.jl as
             # pure value targets — no DP dependency at test time.
+
+            module KleinMapFixtures
+
+            export KLEIN_FVGQ, KLEIN_RBC, KLEIN_RBC_SV, KLEIN_SGU, KLEIN_SW07PFEIFER
 
             """,
         )
@@ -273,6 +293,7 @@ function main()
         _emit_fixture(io, :KLEIN_SGU, sol_sgu); print(io, "\n")
         _emit_fixture(io, :KLEIN_FVGQ, sol_fvgq); print(io, "\n")
         _emit_fixture(io, :KLEIN_SW07PFEIFER, sol_sw07p)
+        print(io, "\nend\n")
     end
     @info "Wrote fixture file" FIXTURE_FILE
     return nothing

@@ -7,10 +7,12 @@
 #   klein_map(A, B; threshold)          → (; g_x, h_x)
 #   klein_map!(g_x, h_x, A, B; threshold)
 #   klein_map(A::SMatrix, B::SMatrix; threshold)  (StaticArrays ext)
+#   klein_map(A::SMatrix, B::SMatrix, Val(n_x), Val(n_y); threshold)
+#       (StaticArrays ext, typed output sizes)
 #
-# n_x is inferred from the BK selection at runtime. No Val(n_x) anywhere.
+# n_x is inferred from the BK selection at runtime for heap and in-place APIs.
 
-# Apply the Klein/Sims algebra given an already-ordered QZ factorization.
+# Apply the Klein/Sims algebra given an already-ordered generalized-Schur factorization.
 # Mutates g_x and h_x; allocates blob/temp scratch buffers.
 function _klein_extract!(
         g_x::AbstractMatrix, h_x::AbstractMatrix,
@@ -50,7 +52,7 @@ function _klein_extract!(
     return (; g_x, h_x)
 end
 
-# Direct QZ + BK selection + reorder. Returns the reordered factorization
+# Direct generalized Schur + BK selection + reorder. Returns the reordered factorization
 # (we only need S, T, Z) and the count of stable generalized eigenvalues.
 function _klein_ordered_schur(A::AbstractMatrix, B::AbstractMatrix, threshold)
     F = schur(A, B)
@@ -62,7 +64,7 @@ end
 
 function klein_map(
         A::AbstractMatrix, B::AbstractMatrix;
-        threshold = DEFAULT_BK_THRESHOLD,
+        threshold = 1.0e-6,
     )
     n = checksquare(A)
     checksquare(B) == n ||
@@ -73,7 +75,7 @@ function klein_map(
             ErrorException(
                 "Blanchard-Kahn condition not satisfied: " *
                     "BK selection returned $n_x stable eigenvalues for an " *
-                    "$(n)x$(n) pencil (need 0 < n_x < n)",
+                    "$(n)x$(n) gschur input (need 0 < n_x < n)",
             ),
         )
     end
@@ -86,7 +88,7 @@ end
 function klein_map!(
         g_x::AbstractMatrix, h_x::AbstractMatrix,
         A::AbstractMatrix, B::AbstractMatrix;
-        threshold = DEFAULT_BK_THRESHOLD,
+        threshold = 1.0e-6,
     )
     n = checksquare(A)
     checksquare(B) == n ||
