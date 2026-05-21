@@ -1,6 +1,7 @@
 using LinearAlgebra: issymmetric, norm
 using MatrixEquations
 using MatrixEquationsAD
+using StaticArrays: SMatrix
 using Test
 
 @testset "lyapdkr primal" begin
@@ -18,4 +19,12 @@ using Test
     @test X_general ≈ lyapd(A, C_symmetric_part)
     @test issymmetric(X_general)
     @test norm(A * X_general * A' - X_general + C_symmetric_part) < 1.0e-12
+
+    As = SMatrix{2, 2, Float64}(A)
+    Cs = SMatrix{2, 2, Float64}(C)
+    Xs = @inferred lyapdkr(As, Cs)
+    @test Xs isa SMatrix{2, 2, Float64}
+    @test Matrix(Xs) ≈ lyapd(A, C)
+    @test issymmetric(Matrix(Xs))
+    @test norm(As * Xs * As' - Xs + Cs) < 1.0e-12
 end

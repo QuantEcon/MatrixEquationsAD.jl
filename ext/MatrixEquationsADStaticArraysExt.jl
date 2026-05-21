@@ -3,7 +3,7 @@ module MatrixEquationsADStaticArraysExt
 using MatrixEquationsAD: MatrixEquationsAD
 using StaticArrays: SMatrix
 
-import MatrixEquationsAD: klein_map
+import MatrixEquationsAD: klein_map, lyapdkr
 
 function klein_map(
         A::SMatrix{n, n, T}, B::SMatrix{n, n, T}, ::Val{n_x};
@@ -25,6 +25,14 @@ function klein_map(
         g_x = SMatrix{n_y, n_x, T}(result.g_x),
         h_x = SMatrix{n_x, n_x, T}(result.h_x),
     )
+end
+
+function lyapdkr(
+        A::SMatrix{n, n, T}, C::SMatrix{n, n, T};
+        tol_diag::Real = Inf, check_psd::Bool = false,
+    ) where {n, T <: Union{Float32, Float64}}
+    X = MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C); tol_diag, check_psd)
+    return SMatrix{n, n, T}(X)
 end
 
 end
