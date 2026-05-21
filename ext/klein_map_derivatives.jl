@@ -18,11 +18,36 @@ function _klein_bigk_plan(A, B, g_x, h_x)
     AE_y = A_mat * E_y
     BE_y = B_mat * E_y
 
-    K_h = LinearAlgebra.kron(I_x, AG)
-    K_g = LinearAlgebra.kron(transpose(h_mat), AE_y)
-    K_g .+= LinearAlgebra.kron(I_x, BE_y)
+    n_h = n_x * n_x
+    K = zeros(T, n * n_x, n_h + n_y * n_x)
+    @inbounds for j in 1:n_x
+        row0 = (j - 1) * n
+        hcol0 = (j - 1) * n_x
+        for k in 1:n_x
+            for i in 1:n
+                K[row0 + i, hcol0 + k] = AG[i, k]
+            end
+        end
 
-    return (; F = LinearAlgebra.lu(hcat(K_h, K_g)), G, h_x = h_mat, n, n_x, n_y)
+        for q in 1:n_x
+            gcol0 = n_h + (q - 1) * n_y
+            hqj = h_mat[q, j]
+            for p in 1:n_y
+                for i in 1:n
+                    K[row0 + i, gcol0 + p] += hqj * AE_y[i, p]
+                end
+            end
+        end
+
+        gcol0 = n_h + (j - 1) * n_y
+        for p in 1:n_y
+            for i in 1:n
+                K[row0 + i, gcol0 + p] += BE_y[i, p]
+            end
+        end
+    end
+
+    return (; F = LinearAlgebra.lu(K), G, h_x = h_mat, n, n_x, n_y)
 end
 
 function _klein_bigk_jvp(plan, dA, dB)

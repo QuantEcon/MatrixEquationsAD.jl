@@ -12,12 +12,6 @@ include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sgu.jl"
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "fvgq.jl"))
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sw07.jl"))
 
-function klein_dual_matrix(A, tangents::NTuple{N}) where {N}
-    return map(A, tangents...) do a, ds...
-        Dual{Nothing}(a, ds...)
-    end
-end
-
 function klein_small_problem(threshold, n_tangents)
     A, B, n_x = RBCExampleMatrices.dp_rbc_first_order_gschur()
     n_y = size(A, 1) - n_x
@@ -111,8 +105,12 @@ function klein_map_oop_heap_group(problem)
     g["forwarddiff_chunked"] = @benchmarkable begin
         klein_map_oop_loss(A_dual, B_dual, Wg, Wh, threshold)
     end setup = begin
-        A_dual = klein_dual_matrix($(problem.A), $(problem.A_tangents))
-        B_dual = klein_dual_matrix($(problem.B), $(problem.B_tangents))
+        A_dual = map($(problem.A), $(problem.A_tangents)...) do a, ds...
+            Dual{Nothing}(a, ds...)
+        end
+        B_dual = map($(problem.B), $(problem.B_tangents)...) do b, ds...
+            Dual{Nothing}(b, ds...)
+        end
         Wg = $(problem.Wg)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
@@ -175,8 +173,12 @@ function klein_map_inplace_heap_group(problem)
     g["forwarddiff_chunked"] = @benchmarkable begin
         klein_map_inplace_loss(A_dual, B_dual, Wg, Wh, threshold)
     end setup = begin
-        A_dual = klein_dual_matrix($(problem.A), $(problem.A_tangents))
-        B_dual = klein_dual_matrix($(problem.B), $(problem.B_tangents))
+        A_dual = map($(problem.A), $(problem.A_tangents)...) do a, ds...
+            Dual{Nothing}(a, ds...)
+        end
+        B_dual = map($(problem.B), $(problem.B_tangents)...) do b, ds...
+            Dual{Nothing}(b, ds...)
+        end
         Wg = $(problem.Wg)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
@@ -241,8 +243,12 @@ function klein_map_oop_static_group(problem)
     g["forwarddiff_chunked"] = @benchmarkable begin
         klein_map_oop_loss(A_dual, B_dual, Wg, Wh, threshold, n_x, n_y)
     end setup = begin
-        A_dual = klein_dual_matrix($(problem.A), $(problem.A_tangents))
-        B_dual = klein_dual_matrix($(problem.B), $(problem.B_tangents))
+        A_dual = map($(problem.A), $(problem.A_tangents)...) do a, ds...
+            Dual{Nothing}(a, ds...)
+        end
+        B_dual = map($(problem.B), $(problem.B_tangents)...) do b, ds...
+            Dual{Nothing}(b, ds...)
+        end
         Wg = $(problem.Wg)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)

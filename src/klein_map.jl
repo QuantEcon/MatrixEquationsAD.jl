@@ -6,11 +6,12 @@
 # Public API:
 #   klein_map(A, B; threshold)          → (; g_x, h_x)
 #   klein_map!(g_x, h_x, A, B; threshold)
-#   klein_map(A::SMatrix, B::SMatrix; threshold)  (StaticArrays ext)
 #   klein_map(A::SMatrix, B::SMatrix, Val(n_x), Val(n_y); threshold)
 #       (StaticArrays ext, typed output sizes)
 #
 # n_x is inferred from the BK selection at runtime for heap and in-place APIs.
+# StaticArrays inputs without explicit Val sizes intentionally fall through to
+# the heap AbstractMatrix method.
 
 # Apply the Klein/Sims algebra given an already-ordered generalized-Schur factorization.
 # Mutates g_x and h_x; allocates blob/temp scratch buffers.

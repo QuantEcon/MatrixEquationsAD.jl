@@ -5,8 +5,8 @@
 # cross-checks against DP-published spot anchors (RBC_SV + SW07).
 #
 # Test convention: full-matrix ≈ at atol = rtol = 1.0e-10. Heap, in-place,
-# and SMatrix dispatches checked per gschur input; SMatrix is skipped for n > 15
-# where it stops being meaningful.
+# SMatrix heap fallback, and explicit Val-sized SMatrix output are checked per
+# gschur input; SMatrix is skipped for n > 15 where it stops being meaningful.
 
 using MatrixEquationsAD: klein_map, klein_map!
 using LinearAlgebra: I, norm
@@ -54,12 +54,16 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
                 As = SMatrix{n, n, Float64}(A)
                 Bs = SMatrix{n, n, Float64}(B)
                 rs = klein_map(As, Bs; threshold = 1.0e-6)
-                @test Matrix(rs.g_x) ≈ F.g_x atol = 1.0e-10 rtol = 1.0e-10
-                @test Matrix(rs.h_x) ≈ F.h_x atol = 1.0e-10 rtol = 1.0e-10
+                @test rs.g_x isa Matrix{Float64}
+                @test rs.h_x isa Matrix{Float64}
+                @test rs.g_x ≈ F.g_x atol = 1.0e-10 rtol = 1.0e-10
+                @test rs.h_x ≈ F.h_x atol = 1.0e-10 rtol = 1.0e-10
 
                 n_x = size(F.h_x, 1)
                 n_y = size(F.g_x, 1)
-                rs_sized = klein_map(As, Bs, Val(n_x), Val(n_y); threshold = 1.0e-6)
+                rs_sized = @inferred klein_map(
+                    As, Bs, Val(n_x), Val(n_y); threshold = 1.0e-6,
+                )
                 @test rs_sized.g_x isa SMatrix{n_y, n_x, Float64}
                 @test rs_sized.h_x isa SMatrix{n_x, n_x, Float64}
                 @test Matrix(rs_sized.g_x) ≈ F.g_x atol = 1.0e-10 rtol = 1.0e-10

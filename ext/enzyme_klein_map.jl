@@ -1,32 +1,5 @@
 const _KLEIN_AD_FLOAT = Union{Float32, Float64}
 
-function _klein_tangent(arg, i, dims, ::Type{T}, N) where {T}
-    if typeof(arg) <: Const
-        return zeros(T, dims)
-    end
-    return N == 1 ? arg.dval : arg.dval[i]
-end
-
-function _klein_shadow(arg, i, N)
-    if typeof(arg) <: Const
-        return nothing
-    end
-    return N == 1 ? arg.dval : arg.dval[i]
-end
-
-function _klein_zero_shadow(::Type{T}, n_y, n_x) where {T}
-    return (; g_x = zeros(T, n_y, n_x), h_x = zeros(T, n_x, n_x))
-end
-
-function _klein_add_shadow!(g_bar, h_bar, shadow)
-    shadow === nothing && return nothing
-    g_bar .+= shadow.g_x
-    h_bar .+= shadow.h_x
-    fill!(shadow.g_x, zero(eltype(shadow.g_x)))
-    fill!(shadow.h_x, zero(eltype(shadow.h_x)))
-    return nothing
-end
-
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
         func::Const{typeof(klein_map)},
@@ -44,10 +17,20 @@ function EnzymeRules.forward(
     plan = _klein_bigk_plan(A.val, B.val, primal.g_x, primal.h_x)
     shadows = ntuple(Val(N)) do i
         Base.@_inline_meta
+        dA = if typeof(A) <: Const
+            zeros(T, size(A.val))
+        else
+            N == 1 ? A.dval : A.dval[i]
+        end
+        dB = if typeof(B) <: Const
+            zeros(T, size(B.val))
+        else
+            N == 1 ? B.dval : B.dval[i]
+        end
         _klein_bigk_jvp(
             plan,
-            _klein_tangent(A, i, size(A.val), T, N),
-            _klein_tangent(B, i, size(B.val), T, N),
+            dA,
+            dB,
         )
     end
 
@@ -77,9 +60,12 @@ function EnzymeRules.augmented_primal(
     shadow = if RT <: Const
         nothing
     elseif EnzymeRules.width(config) == 1
-        _klein_zero_shadow(T, n_y, n_x)
+        (; g_x = zeros(T, n_y, n_x), h_x = zeros(T, n_x, n_x))
     else
-        ntuple(_ -> _klein_zero_shadow(T, n_y, n_x), Val(EnzymeRules.width(config)))
+        ntuple(
+            _ -> (; g_x = zeros(T, n_y, n_x), h_x = zeros(T, n_x, n_x)),
+            Val(EnzymeRules.width(config)),
+        )
     end
     tape = (copy(A.val), copy(B.val), copy(primal.g_x), copy(primal.h_x), shadow)
     returned_primal = EnzymeRules.needs_primal(config) ? primal : nothing
@@ -131,39 +117,79 @@ function EnzymeRules.forward(
     N = EnzymeRules.width(config)
     plan = _klein_structured_plan(A.val, B.val, g_x.val, h_x.val)
 
-    return_shadows = if RT <: Const || !EnzymeRules.needs_shadow(config)
-        nothing
-    else
-        Vector{Any}(undef, N)
+    if RT <: Const || !EnzymeRules.needs_shadow(config)
+        for i in 1:N
+            dA = if typeof(A) <: Const
+                zeros(T, size(A.val))
+            else
+                N == 1 ? A.dval : A.dval[i]
+            end
+            dB = if typeof(B) <: Const
+                zeros(T, size(B.val))
+            else
+                N == 1 ? B.dval : B.dval[i]
+            end
+            deriv = _klein_structured_jvp(plan, dA, dB)
+            dg = if typeof(g_x) <: Const
+                nothing
+            else
+                N == 1 ? g_x.dval : g_x.dval[i]
+            end
+            dh = if typeof(h_x) <: Const
+                nothing
+            else
+                N == 1 ? h_x.dval : h_x.dval[i]
+            end
+            if dg !== nothing
+                copyto!(dg, deriv.g_x)
+            end
+            if dh !== nothing
+                copyto!(dh, deriv.h_x)
+            end
+        end
+        return EnzymeRules.needs_primal(config) ? primal : nothing
     end
 
-    for i in 1:N
-        deriv = _klein_structured_jvp(
-            plan,
-            _klein_tangent(A, i, size(A.val), T, N),
-            _klein_tangent(B, i, size(B.val), T, N),
-        )
-        dg = _klein_shadow(g_x, i, N)
-        dh = _klein_shadow(h_x, i, N)
+    return_shadows = ntuple(Val(N)) do i
+        Base.@_inline_meta
+        dA = if typeof(A) <: Const
+            zeros(T, size(A.val))
+        else
+            N == 1 ? A.dval : A.dval[i]
+        end
+        dB = if typeof(B) <: Const
+            zeros(T, size(B.val))
+        else
+            N == 1 ? B.dval : B.dval[i]
+        end
+        deriv = _klein_structured_jvp(plan, dA, dB)
+        dg = if typeof(g_x) <: Const
+            nothing
+        else
+            N == 1 ? g_x.dval : g_x.dval[i]
+        end
+        dh = if typeof(h_x) <: Const
+            nothing
+        else
+            N == 1 ? h_x.dval : h_x.dval[i]
+        end
         if dg !== nothing
             copyto!(dg, deriv.g_x)
         end
         if dh !== nothing
             copyto!(dh, deriv.h_x)
         end
-        if return_shadows !== nothing
-            return_shadows[i] = (; g_x = deriv.g_x, h_x = deriv.h_x)
-        end
+        (; g_x = deriv.g_x, h_x = deriv.h_x)
     end
 
     if RT <: DuplicatedNoNeed
         return return_shadows[1]
     elseif RT <: BatchDuplicatedNoNeed
-        return Tuple(return_shadows)
+        return return_shadows
     elseif RT <: Duplicated
         return Duplicated(primal, return_shadows[1])
     elseif RT <: BatchDuplicated
-        return BatchDuplicated(primal, Tuple(return_shadows))
+        return BatchDuplicated(primal, return_shadows)
     end
     return EnzymeRules.needs_primal(config) ? primal : nothing
 end
@@ -184,9 +210,12 @@ function EnzymeRules.augmented_primal(
     shadow = if RT <: Const
         nothing
     elseif EnzymeRules.width(config) == 1
-        _klein_zero_shadow(T, n_y, n_x)
+        (; g_x = zeros(T, n_y, n_x), h_x = zeros(T, n_x, n_x))
     else
-        ntuple(_ -> _klein_zero_shadow(T, n_y, n_x), Val(EnzymeRules.width(config)))
+        ntuple(
+            _ -> (; g_x = zeros(T, n_y, n_x), h_x = zeros(T, n_x, n_x)),
+            Val(EnzymeRules.width(config)),
+        )
     end
     tape = (copy(A.val), copy(B.val), copy(g_x.val), copy(h_x.val), shadow)
     returned_primal = EnzymeRules.needs_primal(config) ? primal : nothing
@@ -212,8 +241,16 @@ function EnzymeRules.reverse(
         g_bar = zeros(T, size(g_val))
         h_bar = zeros(T, size(h_val))
 
-        dg = _klein_shadow(g_x, i, N)
-        dh = _klein_shadow(h_x, i, N)
+        dg = if typeof(g_x) <: Const
+            nothing
+        else
+            N == 1 ? g_x.dval : g_x.dval[i]
+        end
+        dh = if typeof(h_x) <: Const
+            nothing
+        else
+            N == 1 ? h_x.dval : h_x.dval[i]
+        end
         if dg !== nothing
             g_bar .+= dg
             fill!(dg, zero(T))
@@ -223,7 +260,11 @@ function EnzymeRules.reverse(
             fill!(dh, zero(T))
         end
         if return_shadow !== nothing
-            _klein_add_shadow!(g_bar, h_bar, N == 1 ? return_shadow : return_shadow[i])
+            sh = N == 1 ? return_shadow : return_shadow[i]
+            g_bar .+= sh.g_x
+            h_bar .+= sh.h_x
+            fill!(sh.g_x, zero(T))
+            fill!(sh.h_x, zero(T))
         end
 
         bars = _klein_structured_vjp(plan, g_bar, h_bar)

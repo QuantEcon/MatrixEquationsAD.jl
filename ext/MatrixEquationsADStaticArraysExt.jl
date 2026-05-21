@@ -26,17 +26,4 @@ function klein_map(
     )
 end
 
-function klein_map(
-        A::SMatrix{n, n, T}, B::SMatrix{n, n, T};
-        threshold = 1.0e-6,
-    ) where {n, T}
-    result = MatrixEquationsAD.klein_map(Matrix(A), Matrix(B); threshold)
-    n_x = size(result.h_x, 1)
-    n_y = n - n_x
-    return (;
-        g_x = SMatrix{n_y, n_x, T}(result.g_x),
-        h_x = SMatrix{n_x, n_x, T}(result.h_x),
-    )
-end
-
 end

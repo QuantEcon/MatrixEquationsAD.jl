@@ -1,17 +1,3 @@
-function _klein_partials_matrix(M, i)
-    return map(x -> partials(x, i), M)
-end
-
-function _klein_dual_matrix(::Type{Tag}, values, tangents::NTuple{N}) where {Tag, N}
-    return map(CartesianIndices(values)) do idx
-        Base.@_inline_meta
-        Dual{Tag}(
-            values[idx],
-            Partials(ntuple(i -> tangents[i][idx], Val(N))),
-        )
-    end
-end
-
 function klein_map(
         A::StridedMatrix{<:Dual{Tag, V, N}},
         B::StridedMatrix{<:Dual{Tag, V, N}};
@@ -24,14 +10,20 @@ function klein_map(
 
     derivs = ntuple(Val(N)) do i
         Base.@_inline_meta
-        _klein_bigk_jvp(plan, _klein_partials_matrix(A, i), _klein_partials_matrix(B, i))
+        _klein_bigk_jvp(plan, map(x -> partials(x, i), A), map(x -> partials(x, i), B))
     end
     dg = ntuple(i -> derivs[i].g_x, Val(N))
     dh = ntuple(i -> derivs[i].h_x, Val(N))
 
     return (;
-        g_x = _klein_dual_matrix(Tag, primal.g_x, dg),
-        h_x = _klein_dual_matrix(Tag, primal.h_x, dh),
+        g_x = map(CartesianIndices(primal.g_x)) do idx
+            Base.@_inline_meta
+            Dual{Tag}(primal.g_x[idx], Partials(ntuple(i -> dg[i][idx], Val(N))))
+        end,
+        h_x = map(CartesianIndices(primal.h_x)) do idx
+            Base.@_inline_meta
+            Dual{Tag}(primal.h_x[idx], Partials(ntuple(i -> dh[i][idx], Val(N))))
+        end,
     )
 end
 
@@ -52,13 +44,25 @@ function klein_map!(
     derivs = ntuple(Val(N)) do i
         Base.@_inline_meta
         _klein_structured_jvp(
-            plan, _klein_partials_matrix(A, i), _klein_partials_matrix(B, i),
+            plan, map(x -> partials(x, i), A), map(x -> partials(x, i), B),
         )
     end
     dg = ntuple(i -> derivs[i].g_x, Val(N))
     dh = ntuple(i -> derivs[i].h_x, Val(N))
 
-    copyto!(g_x, _klein_dual_matrix(Tag, g_val, dg))
-    copyto!(h_x, _klein_dual_matrix(Tag, h_val, dh))
+    copyto!(
+        g_x,
+        map(CartesianIndices(g_val)) do idx
+            Base.@_inline_meta
+            Dual{Tag}(g_val[idx], Partials(ntuple(i -> dg[i][idx], Val(N))))
+        end,
+    )
+    copyto!(
+        h_x,
+        map(CartesianIndices(h_val)) do idx
+            Base.@_inline_meta
+            Dual{Tag}(h_val[idx], Partials(ntuple(i -> dh[i][idx], Val(N))))
+        end,
+    )
     return (; g_x, h_x)
 end
