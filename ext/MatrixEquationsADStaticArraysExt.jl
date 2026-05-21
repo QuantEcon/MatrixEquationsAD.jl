@@ -6,12 +6,13 @@ using StaticArrays: SMatrix
 import MatrixEquationsAD: klein_map
 
 function klein_map(
-        A::SMatrix{n, n, T}, B::SMatrix{n, n, T}, ::Val{n_x}, ::Val{n_y};
+        A::SMatrix{n, n, T}, B::SMatrix{n, n, T}, ::Val{n_x};
         threshold = 1.0e-6,
-    ) where {n, T, n_x, n_y}
-    if n_x + n_y != n
-        throw(DimensionMismatch("Val(n_x) + Val(n_y) must equal matrix size $n"))
+    ) where {n, T, n_x}
+    if !(0 <= n_x <= n)
+        throw(DimensionMismatch("Val(n_x) must be between 0 and matrix size $n"))
     end
+    n_y = n - n_x
     result = MatrixEquationsAD.klein_map(Matrix(A), Matrix(B); threshold)
     if size(result.h_x, 1) != n_x
         throw(

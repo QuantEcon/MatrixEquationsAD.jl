@@ -79,8 +79,8 @@ function klein_map_oop_loss(A, B, Wg, Wh, threshold)
     return dot(Wg, r.g_x) + dot(Wh, r.h_x)
 end
 
-function klein_map_oop_loss(A, B, Wg, Wh, threshold, n_x, n_y)
-    r = klein_map(A, B, n_x, n_y; threshold)
+function klein_map_oop_loss(A, B, Wg, Wh, threshold, n_x)
+    r = klein_map(A, B, n_x; threshold)
     return dot(Wg, r.g_x) + dot(Wh, r.h_x)
 end
 
@@ -229,7 +229,7 @@ function klein_map_oop_static_group(problem)
     g = BenchmarkGroup()
 
     g["primal"] = @benchmarkable begin
-        klein_map_oop_loss(A, B, Wg, Wh, threshold, n_x, n_y)
+        klein_map_oop_loss(A, B, Wg, Wh, threshold, n_x)
     end setup = begin
         A = $(problem.A)
         B = $(problem.B)
@@ -237,11 +237,10 @@ function klein_map_oop_static_group(problem)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
         n_x = Val($(problem.n_x))
-        n_y = Val($(size(problem.Wg, 1)))
     end evals = 4
 
     g["forwarddiff_chunked"] = @benchmarkable begin
-        klein_map_oop_loss(A_dual, B_dual, Wg, Wh, threshold, n_x, n_y)
+        klein_map_oop_loss(A_dual, B_dual, Wg, Wh, threshold, n_x)
     end setup = begin
         A_dual = map($(problem.A), $(problem.A_tangents)...) do a, ds...
             Dual{Nothing}(a, ds...)
@@ -253,14 +252,13 @@ function klein_map_oop_static_group(problem)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
         n_x = Val($(problem.n_x))
-        n_y = Val($(size(problem.Wg, 1)))
     end evals = 4
 
     g["enzyme_batch_forward"] = @benchmarkable Enzyme.autodiff(
         Forward, klein_map_oop_loss, BatchDuplicated,
         BatchDuplicated(A, A_tangents),
         BatchDuplicated(B, B_tangents),
-        Const(Wg), Const(Wh), Const(threshold), Const(n_x), Const(n_y),
+        Const(Wg), Const(Wh), Const(threshold), Const(n_x),
     ) setup = begin
         A = $(problem.A)
         B = $(problem.B)
@@ -270,13 +268,12 @@ function klein_map_oop_static_group(problem)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
         n_x = Val($(problem.n_x))
-        n_y = Val($(size(problem.Wg, 1)))
     end evals = 4
 
     g["enzyme_reverse"] = @benchmarkable Enzyme.autodiff(
         Reverse, klein_map_oop_loss, Active,
         Active(A), Active(B), Const(Wg), Const(Wh), Const(threshold),
-        Const(n_x), Const(n_y),
+        Const(n_x),
     ) setup = begin
         A = $(problem.A)
         B = $(problem.B)
@@ -284,7 +281,6 @@ function klein_map_oop_static_group(problem)
         Wh = $(problem.Wh)
         threshold = $(problem.threshold)
         n_x = Val($(problem.n_x))
-        n_y = Val($(size(problem.Wg, 1)))
     end evals = 4
 
     return g

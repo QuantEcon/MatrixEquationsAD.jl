@@ -61,21 +61,17 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
 
                 n_x = size(F.h_x, 1)
                 n_y = size(F.g_x, 1)
-                rs_sized = @inferred klein_map(
-                    As, Bs, Val(n_x), Val(n_y); threshold = 1.0e-6,
-                )
-                @test rs_sized.g_x isa SMatrix{n_y, n_x, Float64}
-                @test rs_sized.h_x isa SMatrix{n_x, n_x, Float64}
-                @test Matrix(rs_sized.g_x) ≈ F.g_x atol = 1.0e-10 rtol = 1.0e-10
-                @test Matrix(rs_sized.h_x) ≈ F.h_x atol = 1.0e-10 rtol = 1.0e-10
+                rs_static = @inferred klein_map(As, Bs, Val(n_x); threshold = 1.0e-6)
+                @test rs_static.g_x isa SMatrix{n_y, n_x, Float64}
+                @test rs_static.h_x isa SMatrix{n_x, n_x, Float64}
+                @test Matrix(rs_static.g_x) ≈ F.g_x atol = 1.0e-10 rtol = 1.0e-10
+                @test Matrix(rs_static.h_x) ≈ F.h_x atol = 1.0e-10 rtol = 1.0e-10
                 @test_throws DimensionMismatch klein_map(
-                    As, Bs, Val(n_x + 1), Val(n_y); threshold = 1.0e-6,
+                    As, Bs, Val(n + 1); threshold = 1.0e-6,
                 )
-                if n_x != n_y
-                    @test_throws DimensionMismatch klein_map(
-                        As, Bs, Val(n_y), Val(n_x); threshold = 1.0e-6,
-                    )
-                end
+                @test_throws DimensionMismatch klein_map(
+                    As, Bs, Val(n_x + 1); threshold = 1.0e-6,
+                )
             end
         end
     end

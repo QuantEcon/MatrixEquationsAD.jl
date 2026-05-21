@@ -4,6 +4,7 @@ using FiniteDifferences: central_fdm
 using LinearAlgebra: dot
 using MatrixEquationsAD: klein_map, klein_map!
 using Random: MersenneTwister, randn
+using StaticArrays: SMatrix
 using Test
 
 include(joinpath(@__DIR__, "example_matrices", "rbc.jl"))
@@ -15,6 +16,11 @@ end
 
 function klein_map_weighted(A, B, Wg, Wh)::Float64
     r = klein_map(A, B; threshold = 1.0e-6)
+    return dot(Wg, r.g_x) + dot(Wh, r.h_x)
+end
+
+function klein_map_static_weighted(A, B, Wg, Wh, ::Val{n_x})::Float64 where {n_x}
+    r = klein_map(A, B, Val(n_x); threshold = 1.0e-6)
     return dot(Wg, r.g_x) + dot(Wh, r.h_x)
 end
 
@@ -31,6 +37,11 @@ end
     rng = MersenneTwister(13579)
     Wg = 1.0e-5 .* randn(rng, n_y, n_x)
     Wh = 1.0e-5 .* randn(rng, n_x, n_x)
+    n = size(A, 1)
+    As = SMatrix{n, n, Float64}(A)
+    Bs = SMatrix{n, n, Float64}(B)
+    Wgs = SMatrix{n_y, n_x, Float64}(Wg)
+    Whs = SMatrix{n_x, n_x, Float64}(Wh)
 
     @testset "OOP BatchDuplicated forward" begin
         test_forward(
@@ -38,6 +49,15 @@ end
             (copy(A), BatchDuplicated), (copy(B), BatchDuplicated),
             (Wg, Const), (Wh, Const);
             rng = MersenneTwister(1234), fdm = central_fdm(5, 1; max_range = 1.0e-6),
+        )
+    end
+
+    @testset "static OOP BatchDuplicated forward" begin
+        test_forward(
+            klein_map_static_weighted, BatchDuplicated,
+            (As, BatchDuplicated), (Bs, BatchDuplicated),
+            (Wgs, Const), (Whs, Const), (Val(n_x), Const);
+            rng = MersenneTwister(5678), fdm = central_fdm(5, 1; max_range = 1.0e-6),
         )
     end
 

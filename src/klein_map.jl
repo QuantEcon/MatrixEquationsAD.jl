@@ -6,7 +6,7 @@
 # Public API:
 #   klein_map(A, B; threshold)          → (; g_x, h_x)
 #   klein_map!(g_x, h_x, A, B; threshold)
-#   klein_map(A::SMatrix, B::SMatrix, Val(n_x), Val(n_y); threshold)
+#   klein_map(A::SMatrix, B::SMatrix, Val(n_x); threshold)
 #       (StaticArrays ext, typed output sizes)
 #
 # n_x is inferred from the BK selection at runtime for heap and in-place APIs.

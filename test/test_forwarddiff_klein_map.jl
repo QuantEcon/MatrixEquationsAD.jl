@@ -43,14 +43,13 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
         n = size(A, 1)
         n_g = length(F.g_x)
         n_x = size(F.h_x, 1)
-        n_y = size(F.g_x, 1)
         x = [vec(A); vec(B)]
         fdm = central_fdm(5, 1; max_range = 1.0e-4)
 
         function klein_static_vec(x)
             A_x = SMatrix{n, n, eltype(x)}(reshape(x[1:(n * n)], n, n))
             B_x = SMatrix{n, n, eltype(x)}(reshape(x[((n * n) + 1):end], n, n))
-            r = klein_map(A_x, B_x, Val(n_x), Val(n_y); threshold = 1.0e-6)
+            r = klein_map(A_x, B_x, Val(n_x); threshold = 1.0e-6)
             return [vec(r.g_x); vec(r.h_x)]
         end
 
