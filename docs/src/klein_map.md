@@ -433,6 +433,13 @@ substituting into the ``h_x`` block,
 d h_x \;=\; Y_x \;-\; J_x\,d g_x\,h_x.
 ```
 
+For ForwardDiff chunks of width ``N`` or Enzyme `BatchDuplicated` of
+width ``N``, each lane reuses the precomputed ``C_0`` LU and the two
+Schur factorisations ``J_y = Q_y S_y Q_y^\top``,
+``h_x = Q_h S_h Q_h^\top``; only the ``C_0`` back-substitutions, the
+``Q_y / Q_h`` rotations, and one triangular `sylvds!` sweep are
+repeated per lane.
+
 ### VJP
 
 Given output cotangents ``(\bar g_x, \bar h_x)``, the elimination above
@@ -483,6 +490,11 @@ form:
 \;\mathrel{+}=\;
 -\,\Lambda\,\Psi^\top.
 ```
+
+The ``C_0`` LU and the two Schur factorisations are computed once in
+the augmented primal and stashed on Enzyme's tape; the reverse pass
+performs one adjoint `sylvds!` plus one ``C_0^{-\top}`` solve and never
+re-Schurs or re-LU-factorises.
 
 ## Which path wins
 
@@ -595,3 +607,33 @@ through the Klein algebra. The package does not, for four reasons:
    nonsingularity of the linearised operator ``K`` above, which holds
    generically; the QZ-tangent approach needs eigenvalue/eigenvector
    perturbation bounds that degrade as clusters tighten.
+
+## References
+
+- Klein, P. (2000). *Using the generalized Schur form to solve a
+  multivariate linear rational expectations model.*
+  [DOI:10.1016/S0165-1889(99)00045-7](https://doi.org/10.1016/S0165-1889(99)00045-7).
+  Original derivation of the policy ``(g_x, h_x)`` from the QZ
+  decomposition.
+- Sims, C. (2001). *Solving linear rational expectations models.*
+  [DOI:10.1023/A:1020517101123](https://doi.org/10.1023/A:1020517101123).
+  Generalised-Schur method for linear rational-expectations models;
+  motivates the BK ordering used in `klein_map`.
+- Blanchard, O. and Kahn, C. (1980). *The solution of linear difference
+  models under rational expectations.*
+  [DOI:10.2307/1912186](https://doi.org/10.2307/1912186). Source of the
+  ``|\alpha_i| \ge (1 - \tau)|\beta_i|`` selection rule used here.
+- Kao, T.-T. and Hennequin, M. (2020). *Automatic differentiation of
+  Sylvester, Lyapunov, and algebraic Riccati equations.*
+  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). General
+  recipe for differentiating implicit matrix-equation solvers via the
+  IFT, which is the pattern (F) above realises for Klein's policy.
+- Sun, J.-G. (1996). *Perturbation analysis of the generalized Schur
+  decomposition.*
+  [DOI:10.1137/S0895479892242189](https://doi.org/10.1137/S0895479892242189).
+  Background on why QZ-factor tangents are ill-defined at clustered
+  eigenvalues — context for the aside above.
+- LAPACK
+  [`DGGES`](https://www.netlib.org/lapack/explore-html/d7/d25/group__gges_ga556be4f39b39e5008c8eb36814aa7e20.html)
+  documents the generalised real Schur factorisation and the
+  eigenvalue-ordering interface used in `src/klein_map.jl`.

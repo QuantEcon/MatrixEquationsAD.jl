@@ -140,8 +140,12 @@ closed-loop ``A_c``), the gain tangent is
 \Delta F \;=\; G^{-1}\bigl(\Delta M - \Delta G\,F\bigr).
 ```
 
-`MatrixEquationsAD` caches the closed-loop Schur factors so all chunked
-tangents reuse a single factorisation.
+`MatrixEquationsAD` caches the closed-loop Schur factorisation
+``A_c = Z S Z^\top`` and the Cholesky / LU of ``G`` on the value layer.
+ForwardDiff chunks of width ``N`` and Enzyme `BatchDuplicated` of
+width ``N`` reuse both caches: each lane is one triangular Lyapunov
+sweep against the shared Schur factors plus one ``G^{-1}`` solve for
+``\Delta F``.
 
 ### VJP
 
@@ -193,7 +197,10 @@ remaining adjoints:
 Only `X` and `F` are differentiated. The `evals`, `Z`, and `scalinfo`
 return values are returned with zero shadows. The default
 four-argument method is handled by setting ``S = 0`` before
-dispatching to the five-argument rule.
+dispatching to the five-argument rule. The closed-loop Schur and the
+``G`` factorisation are stashed on Enzyme's tape, so multiple reverse
+cotangents (e.g. simultaneous ``\bar X`` and ``\bar F``) share one
+factorisation pair.
 
 References:
 

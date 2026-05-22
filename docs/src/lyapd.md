@@ -156,9 +156,11 @@ are then
 Y\,A\,X^\top \;+\; Y^\top\,A\,X.
 ```
 
-The augmented primal copies the cached Schur and the primal ``X`` onto
-the tape; the reverse pass performs one triangular adjoint solve plus
-the two outer products.
+The augmented primal copies the cached Schur ``(T, Z)`` and the primal
+``X`` onto the tape; the reverse pass performs one triangular adjoint
+solve plus the two outer products. Multiple reverse cotangents (e.g.
+under Enzyme `BatchReverse`) reuse the same cached Schur, exactly as
+forward chunks do.
 
 References:
 

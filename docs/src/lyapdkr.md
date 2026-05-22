@@ -128,15 +128,24 @@ Y\,A\,X^\top \;+\; Y^\top\,A\,X
 ```
 
 — the same contractions as for `lyapd`. The Enzyme augmented primal
-copies the cached factorisation and the primal ``X`` to the tape; the
-reverse pass performs one transposed back-substitution and the two
-outer-product accumulations.
+copies the cached LU factorisation of ``M`` and the primal ``X`` to
+the tape; the reverse pass performs one transposed back-substitution
+against the cached ``M^\top`` and the two outer-product
+accumulations. Multiple reverse cotangents reuse the same cached
+``M``, just as forward chunks do.
 
-References:
+## References
 
-- The vectorisation identity above is a standard Kronecker-`vec`
-  identity; see Petersen and Pedersen,
-  [The Matrix Cookbook](https://www2.imm.dtu.dk/pubdb/pubs/3274-full.html).
+- Petersen, K. B. and Pedersen, M. S. *The Matrix Cookbook.*
+  [PDF](https://www2.imm.dtu.dk/pubdb/pubs/3274-full.html). The
+  Kronecker-`vec` identity
+  ``\operatorname{vec}(A X A^\top) = (A \otimes A)\operatorname{vec}(X)``
+  used in the primal.
+- Kao, T.-T. and Hennequin, M. (2020). *Automatic differentiation of
+  Sylvester, Lyapunov, and algebraic Riccati equations.*
+  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). General recipe
+  for the JVP / VJP derivations above; the cotangent contraction
+  ``\bar A = Y A X^\top + Y^\top A X`` is the discrete-Lyapunov instance.
 - MatrixEquations.jl documents the same discrete Lyapunov equation for
   [`lyapd`](https://andreasvarga.github.io/MatrixEquations.jl/latest/lyapunov.html).
 

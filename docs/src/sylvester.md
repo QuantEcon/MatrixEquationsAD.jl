@@ -112,11 +112,13 @@ d E
 \;-\; d C\,X\,D \;-\; C\,X\,d D.
 ```
 
-`gsylv` caches its generalised-Schur factors and reuses them for every
-chunked-`Dual` partial direction or Enzyme `BatchDuplicated` tangent.
+`gsylv` caches its generalised-Schur factors of the pairs ``(A, -C)``
+and ``(D, B)`` on the value layer and reuses them for every
+chunked-`Dual` partial direction or Enzyme `BatchDuplicated` tangent —
+each lane is one triangular sweep against the shared Schur factors.
 `gsylvkr` caches the LU factorisation of
-``B^\top \otimes A + D^\top \otimes C``; chunked tangents are ``N``
-back-substitutions against that LU.
+``B^\top \otimes A + D^\top \otimes C``; chunked tangents are ``N`` LU
+back-substitutions against that single factorisation.
 
 ## Enzyme VJP
 
@@ -148,8 +150,10 @@ and
 ```
 
 The two implementations share these formulas; only the cached
-factorisation differs (Schur factors for `gsylv`, Kronecker LU for
-`gsylvkr`).
+factorisation differs (generalised-Schur factors for `gsylv`,
+Kronecker LU for `gsylvkr`). In both cases the augmented primal
+stashes the cache on Enzyme's tape so multiple reverse cotangents
+reuse it without refactorising.
 
 ## Differentiating through `gsylv`
 
