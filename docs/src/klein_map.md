@@ -1,32 +1,33 @@
 # Klein Policy Map
 
-`klein_map(A, B; threshold)` returns the Klein/Sims first-order policy
-``(g_x, h_x)`` for a DSGE pencil ``(A, B)`` with the Blanchard-Kahn
-selection at margin ``\tau = \texttt{threshold}``. Two API forms exist:
+`klein_map(A, B; threshold)` extracts the Klein/Sims first-order policy
+``(g_x, h_x)`` from a DSGE-style linearisation. Two API forms exist:
 
-- `klein_map(A, B; threshold)` — heap-allocated, returns a NamedTuple
-  `(; g_x, h_x)`.
+- `klein_map(A, B; threshold)` — heap-allocated, returns the
+  `NamedTuple` `(; g_x, h_x)`.
 - `klein_map!(g_x, h_x, A, B; threshold)` — mutating, writes into
-  caller-supplied buffers; the in-place AD rules use a more memory-efficient
-  reduced-Sylvester factorization.
+  caller-supplied buffers; the in-place AD rules use a more
+  memory-efficient reduced-Sylvester factorisation.
 
 Implementation pointers:
 
-- `src/klein_map.jl` — primal solve via ordered generalized Schur (BK ordering
-  on `|α| ≥ (1 − τ)|β|`) followed by the Klein/Sims algebra.
-- `ext/klein_map_derivatives.jl` — `_klein_bigk_plan` / `_klein_bigk_jvp` /
-  `_klein_bigk_vjp` for the OOP path; `_klein_structured_plan` /
-  `_klein_structured_jvp` / `_klein_structured_vjp` for the in-place path.
-- `ext/enzyme_klein_map.jl` and `ext/forwarddiff_klein_map.jl` — the AD
+- `src/klein_map.jl` — primal solve via ordered generalised Schur (BK
+  ordering on ``|\alpha| \ge (1 - \tau)|\beta|``) followed by the
+  Klein/Sims algebra.
+- `ext/klein_map_derivatives.jl` — `_klein_bigk_plan` /
+  `_klein_bigk_jvp` / `_klein_bigk_vjp` for the out-of-place path;
+  `_klein_structured_plan` / `_klein_structured_jvp` /
+  `_klein_structured_vjp` for the in-place path.
+- `ext/enzyme_klein_map.jl`, `ext/forwarddiff_klein_map.jl` — AD
   frontends.
 
-## Where the Primal Comes From
+## Where the primal comes from
 
-Consider the linearised equilibrium of a DSGE model around a deterministic
-steady state. Partition the state into ``n_x`` predetermined variables
-``x_t`` and ``n_y`` non-predetermined (jump) variables ``y_t``, and write
-``z_t = [x_t;\, y_t] \in \mathbb{R}^{n}`` with ``n = n_x + n_y``. The
-linearised model can be cast in the pencil form
+Consider the linearised equilibrium of a DSGE model around a
+deterministic steady state. Partition the state into ``n_x``
+predetermined variables ``x_t`` and ``n_y`` non-predetermined (jump)
+variables ``y_t``, and write ``z_t = [x_t;\, y_t] \in \mathbb{R}^{n}``
+with ``n = n_x + n_y``. The linearised model takes the form
 
 ```math
 A\,\mathbb{E}_t[z_{t+1}] \;+\; B\,z_t \;=\; 0,
@@ -34,8 +35,7 @@ A\,\mathbb{E}_t[z_{t+1}] \;+\; B\,z_t \;=\; 0,
 A, B \in \mathbb{R}^{n \times n}.
 ```
 
-Klein (2000) shows that the unique bounded solution under the
-Blanchard-Kahn condition takes the linear form
+Under the Blanchard–Kahn condition the unique bounded solution is
 
 ```math
 y_t \;=\; g_x\, x_t,
@@ -43,10 +43,9 @@ y_t \;=\; g_x\, x_t,
 x_{t+1} \;=\; h_x\, x_t \;+\; \text{(shock terms)},
 ```
 
-i.e. the jumps are an affine function of the predetermined state, and the
-predetermined state follows an autonomous linear law of motion. The
-package's `klein_map(A, B; threshold)` returns exactly that
-``(g_x, h_x)``.
+i.e. the jumps are an affine function of the predetermined state, and
+the predetermined state follows an autonomous linear law of motion.
+`klein_map(A, B; threshold)` returns exactly that ``(g_x, h_x)``.
 
 ## Algorithm
 
@@ -62,20 +61,14 @@ g_x
 \in \mathbb{R}^{n \times n_x},
 ```
 
-so that ``z_t = \Psi\,x_t`` under the policy, and ``z_{t+1} = \Psi\,h_x\,x_t``.
-Substituting into the pencil equation,
-
-```math
-A\,\Psi\,h_x\,x_t \;+\; B\,\Psi\,x_t \;=\; 0
-\qquad \text{for all } x_t,
-```
-
-which is the implicit policy equation
+so that ``z_t = \Psi\,x_t`` under the policy, and
+``z_{t+1} = \Psi\,h_x\,x_t``. Substituting into ``A\,z_{t+1} + B\,z_t = 0``
+gives the implicit policy equation
 
 ```math
 F(A, B, g_x, h_x)
 \;:=\;
-A\,\Psi\, h_x \;+\; B\,\Psi
+A\,\Psi\,h_x \;+\; B\,\Psi
 \;=\;
 0
 \quad\in\;\mathbb{R}^{n \times n_x}.
@@ -85,139 +78,202 @@ A\,\Psi\, h_x \;+\; B\,\Psi
 `klein_map` constructs the solution by Klein's QZ-based procedure:
 
 1. Take the real generalised Schur decomposition
-   ``A = Q\, S\, Z^{\!\top}``, ``B = Q\, T\, Z^{\!\top}`` with ``Q``, ``Z``
+   ``A = Q\,S\,Z^\top``, ``B = Q\,T\,Z^\top`` with ``Q``, ``Z``
    orthogonal, ``S`` quasi-upper-triangular, ``T`` upper triangular.
    Eigenvalues are the pairs ``(\alpha_i,\beta_i)``.
 2. Reorder so that the *unstable* generalised eigenvalues
    (``|\alpha_i| \ge (1 - \tau)|\beta_i|``) come first. ``\tau`` is the
    `threshold` keyword; the BK count ``n_x`` is the number of selected
    eigenvalues and must equal the predetermined-block dimension.
-3. Partition into ``b = 1\!:\!n_x`` (unstable, "big") and
-   ``l = (n_x+1)\!:\!n`` (stable) blocks, and read off
+3. Partition into ``b = 1:n_x`` (unstable, "big") and
+   ``l = (n_x+1):n`` (stable) blocks, and read off
+
    ```math
-   g_x \;=\; -\,Z_{l l}^{-\!\top}\, Z_{b l}^{\!\top},
+   g_x \;=\; -\,Z_{ll}^{-\top}\, Z_{bl}^\top,
    \qquad
-   h_x \;=\; -\,\mathrm{blob}^{-1}\, S_{b b}^{-1}\, T_{b b}\,\mathrm{blob},
-   \quad
-   \mathrm{blob} \;=\; Z_{b b}^{\!\top} \;+\; Z_{l b}^{\!\top}\,g_x.
+   h_x \;=\; -\,W^{-1}\, S_{bb}^{-1}\, T_{bb}\, W,
+   \qquad
+   W \;=\; Z_{bb}^\top \;+\; Z_{lb}^\top\,g_x.
    ```
 
-The construction is a direct port of `DifferentiablePerturbation.jl`'s
+The construction is a direct port of
+[`DifferentiablePerturbation.jl`](https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl)'s
 `first_order_perturbation!`; see `src/klein_map.jl` for the indexing.
 
-## Post-Conditions
+## Post-conditions
 
-At the policy returned by `klein_map`, the following hold (each is unit-tested
-on the RBC, RBC_SV, SGU, FVGQ, and SW07PFEIFER fixtures):
+At the policy returned by `klein_map`, each of the following holds (and
+is unit-tested on the RBC, RBC\_SV, SGU, FVGQ, and SW07PFEIFER fixtures):
 
-- **Implicit policy residual:** ``F(A, B, g_x, h_x) = A\,\Psi\,h_x + B\,\Psi = 0``
-  in floating-point arithmetic (typical residual is below ``10^{-8}`` on
-  the standard fixtures and is what `test/test_klein_map.jl` checks).
-- **Saddle-path:** every ``x_0 \in \mathbb{R}^{n_x}`` generates a bounded
-  trajectory ``z_t = \Psi\, h_x^{\,t}\, x_0``.
-- **Stable transition:** the spectrum of ``h_x`` lies strictly inside the
-  unit disc (``\rho(h_x) < 1``), with eigenvalues equal to the stable
-  generalised eigenvalues ``\beta_i/\alpha_i`` of the inverse pencil.
-- **Static algebraic post-conditions** (consequences of the QZ structure
-  the algorithm reads off):
-  ``Z_{l l}^{\!\top}\, g_x \;=\; -\,Z_{b l}^{\!\top}`` and
-  ``\mathrm{blob}\, h_x \;=\; -\,S_{b b}^{-1}\, T_{b b}\,\mathrm{blob}``.
+- **Implicit policy residual:**
+  ``F(A, B, g_x, h_x) = A\,\Psi\,h_x + B\,\Psi = 0`` in floating-point
+  arithmetic (typical residual is below ``10^{-8}``).
+- **Saddle-path:** every ``x_0 \in \mathbb{R}^{n_x}`` generates a
+  bounded trajectory ``z_t = \Psi\,h_x^{\,t}\,x_0``.
+- **Stable transition:** the spectrum of ``h_x`` lies strictly inside
+  the unit disc (``\rho(h_x) < 1``), with eigenvalues equal to the
+  stable generalised eigenvalues ``\beta_i/\alpha_i`` of the pencil.
 
-The factorisation assumptions for the AD rules below are:
+The factorisation assumptions for the AD rules below are: the BK split
+returns exactly ``n_x`` unstable eigenvalues with ``0 < n_x < n``;
+``Z_{ll}`` and ``W`` are nonsingular; and the linearisation of ``F``
+(the Jacobian ``K`` below) is nonsingular at the primal solution.
+Failures throw `ErrorException` (BK / consistency check) or the
+underlying LAPACK exception (Schur / LU).
 
-- the BK split returns exactly ``n_x`` unstable eigenvalues with
-  ``0 < n_x < n``;
-- ``Z_{l l}`` and ``\mathrm{blob}`` are nonsingular (used in the primal);
-- the linearisation of ``F`` (the Jacobian ``K`` below) is nonsingular at
-  the primal solution.
+## Quick start: parameters to policy
 
-Failures throw `ErrorException` (BK / consistency check) or the underlying
-LAPACK exception (Schur / LU).
+The bundled example is a standard RBC model. Its first-order
+linearisation has the parameter vector
 
-Calling `klein_map` on the canonical RBC pencil (assembled by
-`RBCExampleMatrices.rbc_first_order_assembly(p)` from
-[`test/example_matrices/rbc.jl`](https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/test/example_matrices/rbc.jl),
-itself a readable translation of
-[`DifferentiablePerturbation.jl`'s code-generated `RBC.first_order_assembly!`](https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl/blob/main/src/models/RBC_generated/first_order_ip.jl)):
+```math
+p = [\alpha,\ \beta,\ \rho,\ \delta,\ \sigma,\ \Omega_1]
+  = [0.5,\ 0.95,\ 0.2,\ 0.02,\ 0.01,\ 0.01]
+```
 
-```jldoctest
+(capital share, discount factor, TFP persistence, depreciation, TFP
+innovation s.d., observation-noise s.d.). The function below is a
+readable port of
+[`DifferentiablePerturbation.jl`'s code-generated
+`RBC.first_order_assembly!`](https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl/blob/main/src/models/RBC_generated/first_order_ip.jl)
+with each matrix entry written in natural model variables. It is pure
+Julia; ForwardDiff `Dual` and Enzyme `Duplicated` perturbations of `p`
+flow through it into `klein_map`.
+
+The five rows of the linearisation are: 1. Euler equation, 2. capital
+budget, 3. production, 4. TFP AR(1), 5. investment identity. The
+variable ordering is ``z = [k, z_\text{proc}, c, y, i]`` (capital, TFP,
+consumption, output, investment).
+
+```jldoctest klein_rbc
+julia> using LinearAlgebra: eigvals
+
 julia> using MatrixEquationsAD
 
-julia> include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "rbc.jl"));
+julia> function rbc_first_order_assembly(p)
+           α, β, _ρ, δ, _σ, _Ω_1 = p     # σ, Ω_1 don't enter the pencil
+           rk = (1 / β - 1 + δ) / α       # ≡ k_ss^(α-1) from the Euler SS
+           k_ss = rk^(1 / (α - 1))
+           y_ss = k_ss^α
+           c_ss = y_ss - δ * k_ss
+           T = promote_type(typeof(α), typeof(β), typeof(δ), typeof(k_ss))
+           A = zeros(T, 5, 5)
+           B = zeros(T, 5, 5)
+           # Row 1 — Euler
+           A[1, 1] = -β * α * (α - 1) * k_ss^(α - 2) / c_ss
+           A[1, 2] = -β * α * k_ss^(α - 1) / c_ss
+           A[1, 3] = inv(c_ss^2)
+           B[1, 3] = -inv(c_ss^2)
+           # Row 2 — capital budget
+           A[2, 1] = one(T); B[2, 1] = -(one(T) - δ); B[2, 3] = one(T); B[2, 4] = -one(T)
+           # Row 3 — production
+           B[3, 1] = -α * k_ss^(α - 1); B[3, 2] = -y_ss; B[3, 4] = one(T)
+           # Row 4 — TFP AR(1)
+           A[4, 2] = one(T); B[4, 2] = -p[3]
+           # Row 5 — investment identity
+           A[5, 1] = -one(T); B[5, 1] = one(T) - δ; B[5, 5] = one(T)
+           return A, B, 2
+       end;
 
-julia> using .RBCExampleMatrices: rbc_first_order_assembly
+julia> p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01];
 
-julia> A, B, n_x = rbc_first_order_assembly([0.5, 0.95, 0.2, 0.02, 0.01, 0.01]);
+julia> A, B, n_x = rbc_first_order_assembly(p);
 
 julia> r = klein_map(A, B; threshold = 1.0e-6);
 
 julia> size(r.g_x), size(r.h_x)
 ((3, 2), (2, 2))
+
+julia> r.h_x[1, 1] ≈ 0.9568351489231556 && r.h_x[2, 2] ≈ 0.2
+true
 ```
 
-`r.g_x[1, 2]` is the static response of consumption to a TFP innovation;
-`r.h_x[1, 2]` is how a TFP shock propagates into next period's capital.
+`r.g_x` is the static policy: each row gives one jump variable
+(consumption, output, investment) as a linear function of the
+predetermined state ``(k, z)``. `r.h_x` is the state transition, and
+its spectrum sits strictly inside the unit disc:
 
-## Why AD Rules Operate on (F), Not on the QZ Factors
+```jldoctest klein_rbc
+julia> maximum(abs, eigvals(r.h_x)) < 1
+true
+```
 
-In principle one could compute ``(\bar A, \bar B)`` by differentiating the
-generalised-Schur factors ``(S, T, Q, Z)`` and then back-propagating through
-the Klein algebra. We do **not** do that, and the docs derive the AD rules
-directly from the implicit residual ``(F)``. The reasons:
+To differentiate any summary of the policy with respect to the model
+parameters, compose the assembly with `klein_map` and hand the closure
+to
+[`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl).
+The backend (ForwardDiff, Enzyme reverse, etc.) is just an argument:
 
-- **The QZ factors are not unique.** Within each repeated or clustered
-  eigenvalue group, ``Q`` and ``Z`` admit a gauge freedom: any orthogonal
-  transformation that commutes with the Schur block structure leaves
-  ``(S, T)`` unchanged. The tangent of ``(Q, Z)`` is therefore ill-defined
-  precisely where eigenvalues coalesce — e.g. the FVGQ pencil has multiple
-  clusters at ``|\alpha/\beta| = 1``.
-- **Block structure changes are discontinuous.** Real-Schur ``S`` mixes
-  ``1\times 1`` real blocks with ``2\times 2`` complex-conjugate blocks. A
-  perturbation that pushes a real pair into a complex pair (or vice versa)
-  changes the block layout discontinuously. The reordering step that
-  enforces the BK selection has the same issue at threshold crossings.
-- **Klein's policy ``(g_x, h_x)`` is gauge-invariant.** It depends only on
-  the *stable deflating subspace*, not on the particular orthogonal basis
-  chosen for it. Differentiating ``(F)`` reflects that invariance: the
-  tangents ``(dg_x, dh_x)`` are uniquely defined even when ``(dQ, dZ)`` are
-  not.
-- **The QZ-tangent rule needs perturbation theory the IFT does not.** The
-  implicit-function theorem applied to ``(F)`` only requires nonsingularity
-  of the linearised operator ``K`` below, which holds generically; the
-  QZ-tangent approach needs eigenvalue/eigenvector perturbation bounds
-  that degrade as clusters tighten.
+```jldoctest klein_rbc; setup = :(using ForwardDiff; using DifferentiationInterface: AutoForwardDiff, gradient)
+julia> function policy_summary(p)
+           A, B, _ = rbc_first_order_assembly(p)
+           r = klein_map(A, B; threshold = 1.0e-6)
+           return sum(r.g_x) + sum(r.h_x)
+       end;
 
-So the AD rules differentiate ``(F)`` itself. The locally constant
-ingredients (BK selection, real-vs-complex block layout, threshold
-position) are treated as fixed; the assumption is that no eigenvalue
-crosses the threshold under perturbation.
+julia> ∇p = gradient(policy_summary, AutoForwardDiff(), p);
 
-## Jacobian of the Implicit Equation
+julia> (∇p[5], ∇p[6])                       # σ and Ω_1 don't enter (F)
+(0.0, 0.0)
+```
+
+Swapping to Enzyme reverse mode is a one-line change:
+
+```julia
+using Enzyme
+using DifferentiationInterface: AutoEnzyme
+∇p = gradient(policy_summary, AutoEnzyme(mode = Enzyme.Reverse), p)
+```
+
+Or call Enzyme directly without the DifferentiationInterface wrapper:
+
+```julia
+using Enzyme: Active, Const, Duplicated, Reverse, autodiff, make_zero
+
+p̄ = make_zero(p)
+autodiff(Reverse, policy_summary, Active, Duplicated(copy(p), p̄))
+# p̄ now holds the gradient.
+```
+
+Both backends agree with ForwardDiff to floating-point round-off; the
+test suite exercises this directly.
+
+## Jacobian of the implicit equation
 
 Let ``E_y = [\,0_{n_x \times n_y};\, I_{n_y}\,] \in \mathbb{R}^{n \times n_y}``,
-and split the columns of ``A`` and ``B`` as ``A_2 = A E_y``,
-``B_2 = B E_y`` (the trailing ``n_y`` columns). Differentiating ``F = 0``
-at fixed ``(A, B)`` gives
+so the trailing-``n_y``-column projections of ``A`` and ``B`` are
 
 ```math
-A\Psi\,dh_x
+N \;=\; A\,E_y,
+\qquad
+P \;=\; B\,E_y,
+\qquad
+M \;=\; A\,\Psi.
+```
+
+Differentiating ``F = A\,\Psi\,h_x + B\,\Psi = 0`` at fixed ``(A, B)`` gives
+
+```math
+M\,d h_x
 \;+\;
-\bigl(A_2 \, dg_x \, h_x + B_2 \, dg_x\bigr)
+\bigl(N\, d g_x\, h_x + P\, d g_x\bigr)
 \;=\;
--\,dA\,D - dB\,\Psi.
+-\,d A\,\Psi\, h_x \;-\; d B\,\Psi.
+\tag{T}
 ```
 
 Vectorising column-major and stacking the unknowns as
-``[\operatorname{vec}(dh_x);\,\operatorname{vec}(dg_x)] \in \mathbb{R}^{n n_x}``,
+``[\operatorname{vec}(d h_x);\,\operatorname{vec}(d g_x)] \in \mathbb{R}^{n n_x}``,
 
 ```math
 K
 \begin{bmatrix}
-\operatorname{vec}(dh_x) \\
-\operatorname{vec}(dg_x)
+\operatorname{vec}(d h_x) \\
+\operatorname{vec}(d g_x)
 \end{bmatrix}
 \;=\;
--\operatorname{vec}\!\bigl(dA\,D + dB\,\Psi\bigr),
+-\operatorname{vec}\!\bigl(d A\,\Psi\,h_x + d B\,\Psi\bigr),
+\tag{K}
 ```
 
 with
@@ -226,47 +282,50 @@ with
 K
 \;=\;
 \Bigl[\,
-I_{n_x}\otimes A\Psi
+I_{n_x}\otimes M
 \;\Big|\;
-h_x^{\!\top}\otimes A_2 \;+\; I_{n_x}\otimes B_2
+h_x^\top\otimes N \;+\; I_{n_x}\otimes P
 \,\Bigr]
 \;\in\;\mathbb{R}^{n n_x \times n n_x}.
 ```
 
-Two equivalent linear-algebra representations are implemented and produce
-identical tangents up to floating-point roundoff. Both are correct on
-degenerate-cluster pencils (e.g. the FVGQ fixture) because they
-differentiate the implicit equation rather than the non-unique QZ factors.
+Two equivalent linear-algebra representations of (K) are implemented
+and produce identical tangents up to floating-point roundoff. Both are
+correct on degenerate-cluster pencils (e.g. the FVGQ fixture) because
+they differentiate the implicit equation rather than the non-unique QZ
+factors.
 
-## Big-K Factorisation (OOP `klein_map`)
+## Big-K factorisation (OOP `klein_map`)
 
-The OOP rule builds ``K`` once as a dense ``(n n_x) \times (n n_x)`` block
-matrix and stores its LU factorisation in the plan returned by
-`_klein_bigk_plan`. Both forward and reverse modes reuse this single
-factorisation.
+The out-of-place rule builds ``K`` once as a dense
+``(n n_x) \times (n n_x)`` block matrix and stores its LU factorisation
+in the plan returned by `_klein_bigk_plan`. Both forward and reverse
+modes reuse this single factorisation.
 
-### ForwardDiff / Enzyme JVP
+### JVP (ForwardDiff / Enzyme forward)
 
-For each tangent direction ``(dA, dB)``,
+For each tangent direction ``(d A, d B)``,
 
 ```math
 \begin{bmatrix}
-\operatorname{vec}(dh_x) \\
-\operatorname{vec}(dg_x)
+\operatorname{vec}(d h_x) \\
+\operatorname{vec}(d g_x)
 \end{bmatrix}
 \;=\;
-K^{-1}\,\operatorname{vec}\!\bigl(-(dA\,D + dB\,\Psi)\bigr).
+K^{-1}\,\operatorname{vec}\!\bigl(-(d A\,\Psi\,h_x + d B\,\Psi)\bigr).
 ```
 
-`_klein_bigk_jvp` forms the right-hand side ``R = -(dA\,D + dB\,\Psi)``,
-performs one LU back-substitution, and reshapes the solution into
-``(dh_x, dg_x)``. ForwardDiff chunks of width ``N`` and Enzyme
-`BatchDuplicated` of width ``N`` both issue ``N`` such back-substitutions
-against the shared factorisation.
+`_klein_bigk_jvp` forms the right-hand side
+``R = -(d A\,\Psi\,h_x + d B\,\Psi)``, performs one LU
+back-substitution, and reshapes the solution into ``(d h_x, d g_x)``.
+ForwardDiff chunks of width ``N`` and Enzyme `BatchDuplicated` of width
+``N`` both issue ``N`` such back-substitutions against the shared
+factorisation.
 
-### Enzyme VJP
+### VJP (Enzyme reverse)
 
-Pack the output cotangents in the same block order as ``K``:
+Pack the output cotangents in the same block order as ``K`` and solve
+the transposed system:
 
 ```math
 u
@@ -274,48 +333,49 @@ u
 \begin{bmatrix}
 \operatorname{vec}(\bar h_x) \\
 \operatorname{vec}(\bar g_x)
-\end{bmatrix}
-\;\in\;\mathbb{R}^{n n_x},
+\end{bmatrix},
 \qquad
-\lambda = K^{-\!\top} u,
+\lambda \;=\; K^{-\top} u,
 \qquad
-\Lambda = \operatorname{reshape}(\lambda,\, n,\, n_x).
+\Lambda \;=\; \operatorname{reshape}(\lambda,\, n,\, n_x).
 ```
 
 Because the residual ``R`` depends on ``A`` and ``B`` only through
-``R = -(dA\,D + dB\,\Psi)``, the parameter cotangents are
+``R = -(d A\,\Psi\,h_x + d B\,\Psi)``, the parameter cotangents are
 
 ```math
 \bar A
 \;\mathrel{+}=\;
--\,\Lambda\,D^{\!\top}
-\;=\;
--\,\Lambda\,h_x^{\!\top}\,\Psi^{\!\top},
+-\,\Lambda\,h_x^\top\,\Psi^\top,
 \qquad
 \bar B
 \;\mathrel{+}=\;
--\,\Lambda\,\Psi^{\!\top}.
+-\,\Lambda\,\Psi^\top.
 ```
 
-`_klein_bigk_vjp` performs the single transposed LU solve, reshapes ``\lambda``,
-and applies these outer products.
+`_klein_bigk_vjp` performs the single transposed LU solve, reshapes
+``\lambda``, and applies these outer products.
 
-## Reduced-Sylvester Factorisation (in-place `klein_map!`)
+## Reduced-Sylvester factorisation (in-place `klein_map!`)
 
-The in-place rule never materialises the full ``K``. It instead builds the
-``n \times n`` block
+The in-place rule never materialises the full ``K``. It instead builds
+the ``n \times n`` block
 
 ```math
 C_0
 =
 \begin{bmatrix}
-A\Psi & B_2
+M & P
+\end{bmatrix}
+=
+\begin{bmatrix}
+A\,\Psi & B\,E_y
 \end{bmatrix}
 \;\in\;\mathbb{R}^{n \times n},
 ```
 
 LU-factorises ``C_0``, solves once for the auxiliary matrix
-``J = C_0^{-1} A E_y \in \mathbb{R}^{n \times n_y}``, and splits it into
+``J = C_0^{-1} N \in \mathbb{R}^{n \times n_y}``, and splits it into
 
 ```math
 J
@@ -331,54 +391,67 @@ J_y \in \mathbb{R}^{n_y \times n_y}.
 ```
 
 Real Schur factorisations
-``J_y = Q_y S_y Q_y^{\!\top}`` and ``h_x = Q_h S_h Q_h^{\!\top}`` are
-computed once and reused.
+``J_y = Q_y S_y Q_y^\top`` and ``h_x = Q_h S_h Q_h^\top`` are computed
+once and reused.
 
 ### JVP
 
-Let ``Y = C_0^{-1} R`` with ``R = -(dA\,D + dB\,\Psi)``, and split
-``Y = [Y_x;\,Y_y]``. Premultiplying the tangent equation by
-``C_0^{-1}`` and matching block rows gives
+Rewrite the tangent equation (T) by collecting ``(d h_x, d g_x)``
+in the first ``n`` columns and isolating the cross-term:
 
 ```math
-\boxed{\;\;
-dg_x \;+\; J_y\,dg_x\,h_x \;=\; Y_y
-\;\;}
+C_0
+\begin{bmatrix} d h_x \\ d g_x \end{bmatrix}
+\;+\; N\, d g_x\, h_x
+\;=\;
+R,
+\qquad
+R \;=\; -(d A\,\Psi\,h_x + d B\,\Psi).
 ```
 
-which is a discrete Sylvester / Stein equation. In the Schur frame
-``\tilde X = Q_y^{\!\top} dg_x\, Q_h`` it becomes
+Vectorising recovers the big-K system (K); premultiplying by ``C_0^{-1}``
+and using ``J = C_0^{-1} N`` eliminates ``d h_x`` and yields a discrete
+Sylvester / Stein equation in ``d g_x`` alone. Concretely, let
+``Y = C_0^{-1} R`` and split ``Y = [Y_x;\,Y_y]`` (matching the
+``n_x + n_y = n`` block structure). The block rows give the discrete
+Sylvester / Stein equation
 
 ```math
-S_y\,\tilde X\,S_h \;+\; \tilde X \;=\; Q_y^{\!\top} Y_y Q_h,
+d g_x \;+\; J_y\,d g_x\,h_x \;=\; Y_y.
+```
+
+In the Schur frame ``\tilde X = Q_y^\top d g_x\, Q_h`` it becomes
+
+```math
+S_y\,\tilde X\,S_h \;+\; \tilde X \;=\; Q_y^\top Y_y Q_h,
 ```
 
 solved in place by `MatrixEquations.sylvds!`. Back-transforming and
 substituting into the ``h_x`` block,
 
 ```math
-dh_x \;=\; Y_x \;-\; J_x\,dg_x\,h_x.
+d h_x \;=\; Y_x \;-\; J_x\,d g_x\,h_x.
 ```
 
 ### VJP
 
 Given output cotangents ``(\bar g_x, \bar h_x)``, the elimination above
-flows backwards as follows. The ``dh_x`` formula contributes to ``\bar Y_x``
-and induces a correction on the ``dg_x`` cotangent:
+flows backwards. The ``d h_x`` formula contributes to ``\bar Y_x`` and
+induces a correction on the ``d g_x`` cotangent:
 
 ```math
 \bar Y_x \;=\; \bar h_x,
 \qquad
 \tilde{\bar g}_x
 \;=\;
-\bar g_x \;-\; J_x^{\!\top}\,\bar h_x\,h_x^{\!\top}.
+\bar g_x \;-\; J_x^\top\,\bar h_x\,h_x^\top.
 ```
 
 The corrected ``\tilde{\bar g}_x`` is the right-hand side of the adjoint
 Stein equation
 
 ```math
-J_y^{\!\top}\,Z\,h_x^{\!\top} \;+\; Z \;=\; \tilde{\bar g}_x,
+J_y^\top\,Z\,h_x^\top \;+\; Z \;=\; \tilde{\bar g}_x,
 \qquad
 \bar Y_y \;=\; Z,
 ```
@@ -394,7 +467,7 @@ Schur coordinates. Reassembling
 Z
 \end{bmatrix},
 \qquad
-\Lambda \;=\; C_0^{-\!\top}\,\bar Y,
+\Lambda \;=\; C_0^{-\top}\,\bar Y,
 ```
 
 requires one transposed LU back-substitution against the same ``C_0``
@@ -404,28 +477,28 @@ form:
 ```math
 \bar A
 \;\mathrel{+}=\;
--\,\Lambda\,h_x^{\!\top}\,\Psi^{\!\top},
+-\,\Lambda\,h_x^\top\,\Psi^\top,
 \qquad
 \bar B
 \;\mathrel{+}=\;
--\,\Lambda\,\Psi^{\!\top}.
+-\,\Lambda\,\Psi^\top.
 ```
 
-## Which Path Wins
+## Which path wins
 
 | Pencil size | Big-K (OOP) | Reduced Sylvester (in-place) |
 | --- | --- | --- |
 | Small (n ≲ 15) | Faster — LU is cheap, single multi-RHS solve. | Setup overhead (two Schurs + one LU) dominates. |
 | Large (n ≳ 30) | LU of ``(n n_x)^2`` becomes expensive. | Wins; only ``n_y \times n_y`` Schur + per-tangent `sylvds!`. |
 
-At the SW07PFEIFER pencil (``n = 42``, ``n_x = 20``) the in-place reverse
-runs roughly five times faster than the OOP reverse. At the RBC pencil
-(``n = 5``) the OOP path wins by ~50%.
+At the SW07PFEIFER pencil (``n = 42``, ``n_x = 20``) the in-place
+reverse runs roughly five times faster than the OOP reverse. At the RBC
+pencil (``n = 5``) the OOP path wins by ~50%.
 
-## SMatrix Dispatch
+## SMatrix dispatch
 
-`StaticArrays` support requires explicit `Val(n_x)` so the return type is
-statically sized:
+`StaticArrays` support requires explicit `Val(n_x)` so the return type
+is statically sized:
 
 ```julia
 using StaticArrays
@@ -435,44 +508,20 @@ r = klein_map(As, Bs, Val(2); threshold = 1.0e-6)
 @assert r.h_x isa SMatrix{2, 2, Float64}
 ```
 
-Without the `Val`, an SMatrix input falls through to the heap dispatch and
-returns plain `Matrix` outputs — type-stable code-gen requires the BK split
-to be known at compile time, and a runtime BK count cannot satisfy that.
+Without the `Val`, an SMatrix input falls through to the heap dispatch
+and returns plain `Matrix` outputs — type-stable code-gen requires the
+BK split to be known at compile time, and a runtime BK count cannot
+satisfy that.
 
-## Examples
+## More AD examples
 
-All snippets below assemble the RBC pencil from a parameter vector and
-then call the policy map, so AD can flow from `p` through the assembly
-into `klein_map`:
-
-```julia
-include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "rbc.jl"))
-using .RBCExampleMatrices: rbc_first_order_assembly
-
-p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]
-A, B, n_x = rbc_first_order_assembly(p)
-n_y = size(A, 1) - n_x
-```
-
-A gradient of a policy-summary functional with respect to the parameter
-vector uses ForwardDiff straight through:
+ForwardDiff Jacobian of the flattened policy against the flattened
+linearisation:
 
 ```julia
-using ForwardDiff
-function policy_loss(p)
-    A, B, _ = rbc_first_order_assembly(p)
-    r = klein_map(A, B; threshold = 1.0e-6)
-    return sum(r.g_x) + sum(r.h_x)
-end
-∇p = ForwardDiff.gradient(policy_loss, p)
-```
+using ForwardDiff, MatrixEquationsAD
 
-ForwardDiff Jacobian of the flattened policy against the flattened pencil:
-
-```julia
-using ForwardDiff
-using MatrixEquationsAD
-
+A, B, n_x = rbc_first_order_assembly([0.5, 0.95, 0.2, 0.02, 0.01, 0.01])
 n = size(A, 1)
 function klein_vec(x)
     A_x = reshape(x[1:(n*n)], n, n)
@@ -490,15 +539,15 @@ Enzyme batched forward of width 4 on a scalar loss:
 using Enzyme, Random
 
 rng = MersenneTwister(0)
-dA_lanes = ntuple(_ -> randn(rng, n, n), Val(4))
-dB_lanes = ntuple(_ -> randn(rng, n, n), Val(4))
+dA_lanes = ntuple(_ -> randn(rng, size(A)...), Val(4))
+dB_lanes = ntuple(_ -> randn(rng, size(B)...), Val(4))
 
-loss(A, B) = (r = klein_map(A, B); sum(r.g_x) + sum(r.h_x))
+loss(A, B) = (r = klein_map(A, B; threshold = 1.0e-6); sum(r.g_x) + sum(r.h_x))
 
 (out,) = Enzyme.autodiff(
-    Forward, loss, BatchDuplicated,
-    BatchDuplicated(copy(A), dA_lanes),
-    BatchDuplicated(copy(B), dB_lanes),
+    Enzyme.Forward, loss, Enzyme.BatchDuplicated,
+    Enzyme.BatchDuplicated(copy(A), dA_lanes),
+    Enzyme.BatchDuplicated(copy(B), dB_lanes),
 )
 # `out` is a NamedTuple of the four scalar JVPs, one per tangent direction.
 ```
@@ -506,18 +555,43 @@ loss(A, B) = (r = klein_map(A, B); sum(r.g_x) + sum(r.h_x))
 In-place reverse on a `klein_map!` call:
 
 ```julia
+n_y = size(A, 1) - n_x
 g_x = zeros(n_y, n_x);  h_x = zeros(n_x, n_x)
 A_bar = zero(A);  B_bar = zero(B)
 
 Enzyme.autodiff(
-    Reverse, (g, h, A, B) -> (klein_map!(g, h, A, B); sum(g) + sum(h)),
-    Active,
-    Duplicated(g_x, zero(g_x)),
-    Duplicated(h_x, zero(h_x)),
-    Duplicated(copy(A), A_bar),
-    Duplicated(copy(B), B_bar),
+    Enzyme.Reverse,
+    (g, h, A, B) -> (klein_map!(g, h, A, B; threshold = 1.0e-6); sum(g) + sum(h)),
+    Enzyme.Active,
+    Enzyme.Duplicated(g_x, zero(g_x)),
+    Enzyme.Duplicated(h_x, zero(h_x)),
+    Enzyme.Duplicated(copy(A), A_bar),
+    Enzyme.Duplicated(copy(B), B_bar),
 )
 ```
 
-The `klein_map!` rule uses the reduced-Sylvester path; the OOP `klein_map`
-loss above routes through the big-K rule instead.
+The `klein_map!` rule uses the reduced-Sylvester path; the OOP
+`klein_map` loss above routes through the big-K rule instead.
+
+## Aside: why AD on (F) rather than the QZ factors
+
+In principle one could compute ``(\bar A, \bar B)`` by differentiating
+the generalised-Schur factors ``(S, T, Q, Z)`` and back-propagating
+through the Klein algebra. The package does not, for four reasons:
+
+1. The QZ factors admit a gauge freedom on repeated or clustered
+   eigenvalues — any orthogonal transformation commuting with the
+   block structure leaves ``(S, T)`` unchanged — so the tangent of
+   ``(Q, Z)`` is ill-defined precisely where eigenvalues coalesce.
+2. Real-Schur ``S`` mixes ``1 \times 1`` real blocks with
+   ``2 \times 2`` complex-conjugate blocks; perturbations that swap
+   block types are discontinuous, and the BK-reordering step has the
+   same issue at threshold crossings.
+3. Klein's ``(g_x, h_x)`` depends only on the stable deflating
+   subspace, not on the orthogonal basis chosen for it.
+   Differentiating ``F`` reflects that invariance: ``(d g_x, d h_x)``
+   is uniquely defined even when ``(d Q, d Z)`` is not.
+4. The implicit-function theorem applied to ``F`` only requires
+   nonsingularity of the linearised operator ``K`` above, which holds
+   generically; the QZ-tangent approach needs eigenvalue/eigenvector
+   perturbation bounds that degrade as clusters tighten.

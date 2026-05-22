@@ -21,6 +21,8 @@ makedocs(;
         "Klein Policy Map" => "klein_map.md",
         "Discrete Lyapunov (Schur)" => "lyapd.md",
         "Kronecker Discrete Lyapunov" => "lyapdkr.md",
+        "Generalised Sylvester" => "sylvester.md",
+        "Algebraic Riccati (DARE)" => "ared.md",
     ],
 )
 
