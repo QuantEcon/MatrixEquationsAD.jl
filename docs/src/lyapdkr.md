@@ -122,43 +122,39 @@ After solving for the Klein policy, the predetermined-state law of motion
 is
 
 ```math
-x_{t+1} = h_x\, x_t + B_x\,\varepsilon_{t+1},
+x_{t+1} = h_x\, x_t + B_{\text{shock}}\,\varepsilon_{t+1},
 ```
 
-with `x = [k, z]` for the RBC model and shock loading ``B_x = [0; \sigma]``
-— the TFP innovation feeds into the AR(1) for ``z`` and nothing else.
-``Q = B_x B_x^{\!\top}`` is the one-step innovation covariance and the
-stationary covariance ``V = h_x V h_x^{\!\top} + Q`` solved by `lyapdkr`
-is what you'd condition on to write down the long-run distribution of
-``(k, z)`` or compute a Kalman filter.
+with `x = [k, z]` for the RBC model. The TFP innovation feeds into the
+AR(1) for ``z`` and nothing else, so ``B_{\text{shock}} = [0;\, \sigma]``.
+The one-step innovation covariance is
+``Q = B_{\text{shock}}\,B_{\text{shock}}^{\!\top}`` and the stationary
+covariance ``V = h_x V h_x^{\!\top} + Q`` solved by `lyapdkr` is what
+you'd condition on to write down the long-run distribution of ``(k, z)``
+or compute a Kalman filter.
 
 The closed-form AR(1) variance ``\sigma^2/(1-\rho^2)`` gives the analytic
-TFP marginal — useful as a sanity reading, and shown below:
+TFP marginal — useful as a sanity reading, and shown below using the
+bundled fixture:
 
 ```jldoctest
 julia> using MatrixEquationsAD
 
 julia> include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "rbc.jl"));
 
-julia> using .RBCExampleMatrices: rbc_first_order_assembly
+julia> (; h_x, B_shock) = RBCExampleMatrices.dp_rbc_first_order_inputs();
 
-julia> p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01];
+julia> Q = B_shock * transpose(B_shock);
 
-julia> A, B, _ = rbc_first_order_assembly(p);
+julia> V = lyapdkr(h_x, Q);
 
-julia> r = klein_map(A, B; threshold = 1.0e-6);
-
-julia> Q = [0.0 0.0; 0.0 p[5]^2];
-
-julia> V = lyapdkr(r.h_x, Q);
-
-julia> round(sqrt(V[2, 2]); sigdigits = 4)         # stationary std. of z (% units)
+julia> round(sqrt(V[2, 2]); sigdigits = 4)          # stationary std. of z (% units)
 0.01021
 
-julia> V[2, 2] ≈ p[5]^2 / (1 - p[3]^2)             # matches AR(1) closed form
+julia> V[2, 2] ≈ 0.01^2 / (1 - 0.2^2)                # matches AR(1) closed form
 true
 
-julia> round(sqrt(V[1, 1]); sigdigits = 3)         # std. of capital deviation
+julia> round(sqrt(V[1, 1]); sigdigits = 3)          # std. of capital deviation
 0.265
 ```
 
@@ -166,9 +162,9 @@ TFP fluctuates at roughly 1% in stationary equilibrium; capital, which
 absorbs cumulative TFP shocks through the policy term ``h_x[1,2]``,
 fluctuates ~25× more.
 
-Differentiating either ``V`` or any summary of it with respect to
-``p`` works straight through the `rbc_first_order_assembly → klein_map →
-lyapdkr` pipeline.
+Differentiating either ``V`` or any summary of it with respect to the
+RBC parameters ``p`` works straight through the
+`rbc_first_order_assembly → klein_map → lyapdkr` pipeline.
 
 Enzyme reverse mode against a scalar loss:
 

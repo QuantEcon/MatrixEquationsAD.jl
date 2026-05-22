@@ -103,11 +103,13 @@ Both backends return the same gradient to floating-point round-off; the
 test suite exercises this directly.
 
 The other DSGE pencils used by the test/benchmark suites have analogous
-precomputed getters but no parametric assembly:
-`RBCExampleMatrices.dp_rbc_sv_first_order_gschur` (RBC with stochastic
-volatility, ``n = 8``), `SGUExampleMatrices.dp_sgu_first_order_gschur`
-(``n = 15``), `FVGQExampleMatrices.fvgq_klein_gschur_A` / `_B`
-(``n = 38``), and `SW07ExampleMatrices.dp_sw07pfeifer_first_order_gschur`
+precomputed fixture bundles but no parametric assembly. Each one returns a
+`(; A_schur, B_schur, B_shock, g_x, h_x, n_x)` `NamedTuple` so the same
+destructuring works downstream:
+`RBCExampleMatrices.dp_rbc_sv_first_order_inputs` (RBC with stochastic
+volatility, ``n = 8``), `SGUExampleMatrices.dp_sgu_first_order_inputs`
+(``n = 15``), `FVGQExampleMatrices.dp_fvgq_first_order_inputs`
+(``n = 38``), and `SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs`
 (``n = 42``).
 
 Differentiate the policy with Enzyme reverse mode:

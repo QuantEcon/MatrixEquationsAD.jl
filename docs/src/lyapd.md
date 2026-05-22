@@ -117,12 +117,11 @@ that lie in its parameter space.
 
 ## Example: RBC stationary covariance, end-to-end
 
-Stitching the parameter-to-policy pipeline from the [Quick
-start](index.md) onto a `lyapd` call yields the stationary state
-covariance under the Klein/Sims policy. The TFP shock is the only
-innovation, so the one-step covariance is
-``Q = \mathrm{diag}(0,\, \sigma^2)`` and the stationary covariance
-``V`` satisfies ``V = h_x\, V\, h_x^{\!\top} + Q``:
+The bundled RBC fixture `dp_rbc_first_order_inputs()` returns a
+`NamedTuple` `(; A_schur, B_schur, B_shock, g_x, h_x, n_x)`. Pairing
+its `h_x` with ``Q = B_{\text{shock}}\,B_{\text{shock}}^{\!\top}`` and
+solving ``V = h_x\, V\, h_x^{\!\top} + Q`` gives the stationary state
+covariance under the Klein/Sims policy:
 
 ```jldoctest
 julia> using LinearAlgebra: Symmetric
@@ -133,25 +132,19 @@ julia> using MatrixEquationsAD
 
 julia> include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "rbc.jl"));
 
-julia> using .RBCExampleMatrices: rbc_first_order_assembly
+julia> (; h_x, B_shock) = RBCExampleMatrices.dp_rbc_first_order_inputs();
 
-julia> p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01];
+julia> Q = Symmetric(B_shock * transpose(B_shock));
 
-julia> A, B, _ = rbc_first_order_assembly(p);
+julia> V = lyapd(h_x, Q);
 
-julia> r = klein_map(A, B; threshold = 1.0e-6);
-
-julia> Q = Symmetric([0.0 0.0; 0.0 p[5]^2]);
-
-julia> V = lyapd(r.h_x, Q);
-
-julia> V[2, 2] ≈ p[5]^2 / (1 - p[3]^2)             # matches AR(1) closed form
+julia> V[2, 2] ≈ 0.01^2 / (1 - 0.2^2)               # matches AR(1) closed form
 true
 
-julia> round(sqrt(V[2, 2]); sigdigits = 4)         # TFP stationary std. (~1%)
+julia> round(sqrt(V[2, 2]); sigdigits = 4)          # TFP stationary std. (~1%)
 0.01021
 
-julia> round(sqrt(V[1, 1]); sigdigits = 3)         # capital stationary std.
+julia> round(sqrt(V[1, 1]); sigdigits = 3)          # capital stationary std.
 0.265
 ```
 
@@ -162,8 +155,9 @@ right call here — its cost is ``O(n^3)`` in the state dimension, and
 `MatrixEquationsAD` adds a single `schur(A)` cache reused across all AD
 directions on top.
 
-Differentiating any summary of ``V`` with respect to ``p`` works
-straight through the `rbc_first_order_assembly → klein_map → lyapd`
-pipeline with [DifferentiationInterface](index.md#quick-start-parameters-pencil-policy);
+Differentiating any summary of ``V`` with respect to the RBC parameters
+``p`` works straight through the `rbc_first_order_assembly → klein_map →
+lyapd` pipeline with
+[DifferentiationInterface](index.md#quick-start-parameters-pencil-policy);
 the test suite exercises both ForwardDiff and Enzyme reverse against the
 same closure.
