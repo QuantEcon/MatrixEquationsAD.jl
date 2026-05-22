@@ -1,52 +1,8 @@
-@concrete struct LyapDSchurCache
-    T
-    Z
-end
-
-function lyapdfactor(A::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
-    F = schur(A)
-    return LyapDSchurCache(F.T, F.Z)
-end
-
-function lyapdsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
-    rhs = cache.Z' * C * cache.Z
-    sylvds!(-cache.T, cache.T, rhs; adjB = true)
-    rhs = cache.Z * rhs * cache.Z'
-    return rhs
-end
-
-function lyapdsolve(cache::LyapDSchurCache, C::Symmetric{T, <:StridedMatrix{T}}) where {T}
-    rhs = utqu(C, cache.Z)
-    lyapds!(cache.T, rhs)
-    utqu!(rhs, cache.Z')
-    return rhs
-end
-
-function lyapdadjointsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
-    rhs = cache.Z' * C * cache.Z
-    sylvds!(-cache.T, cache.T, rhs; adjA = true)
-    rhs = cache.Z * rhs * cache.Z'
-    return rhs
-end
-
-function lyapdadjointsolve(
-        cache::LyapDSchurCache, C::Symmetric{T, <:StridedMatrix{T}}
-    ) where {T}
-    rhs = utqu(C, cache.Z)
-    lyapds!(cache.T, rhs; adj = true)
-    utqu!(rhs, cache.Z')
-    return rhs
-end
-
-function lyapd(A::StridedMatrix{T}, C::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
-    return lyapdsolve(lyapdfactor(A), C)
-end
-
-function lyapd(
-        A::StridedMatrix{T}, C::Symmetric{T, <:StridedMatrix{T}}
-    ) where {T <: Union{Float32, Float64}}
-    return lyapdsolve(lyapdfactor(A), C)
-end
+# AD-rule plumbing and Enzyme rules for `MatrixEquations.lyapd` and the
+# in-place `MatrixEquationsAD.lyapd!`. Primal kernels and the cache type
+# (`LyapDSchurCache`, `lyapdfactor`, `lyapdsolve`, `lyapdadjointsolve`,
+# the cache-aware `lyapd` shadow, and all `lyapd!` Float methods) live in
+# `src/lyapd.jl`.
 
 @inline function _dense_copy(A::StridedMatrix)
     return copy(A)
@@ -248,4 +204,144 @@ function EnzymeRules.reverse(
         C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}}
     ) where {RT, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_reverse(config, RT, tape, A, C)
+end
+# ─── Enzyme rules for lyapd! ─────────────────────────────────────────────────
+#
+# `lyapd!` returns `nothing` and mutates `X`, so the function-value annotation
+# is always `Const`; tangents/cotangents on the output flow through
+# `X.dval` (or `X.dval[i]` under `BatchDuplicated`). The cache rides the tape
+# for reverse mode so the reverse pass never re-schurs `A`.
+
+function _lyapd_inplace_enzyme_forward(
+        config::EnzymeRules.FwdConfig, ::Type{RT}, X, A, C,
+    ) where {RT}
+    cache = lyapdfactor(A.val)
+    lyapd!(X.val, cache, C.val)
+
+    # If X is `Const`, the caller is asking only for the primal write into
+    # `X.val`; no tangent buffer to fill.
+    typeof(X) <: Const && return nothing
+
+    N = EnzymeRules.width(config)
+    for i in 1:N
+        # `_shadow_dense(C, …)` already gives a fresh copy of `C.dval[i]`
+        # (or zeros for `Const`); mutate it in place to build the tangent
+        # RHS. `dA` is only read, so `_shadow_ref` is enough — copying it
+        # would be a wasted full-matrix alloc per lane.
+        rhs = _shadow_dense(C, i, N)
+        if !(typeof(A) <: Const)
+            dA = _shadow_ref(A, i, N)
+            rhs .+= dA * X.val * A.val'
+            rhs .+= A.val * X.val * dA'
+        end
+        # Solve into the caller-supplied shadow buffer directly — saves
+        # the intermediate `dX = lyapdsolve(…); copyto!(…)` alloc.
+        dX_target = N == 1 ? X.dval : X.dval[i]
+        lyapd!(dX_target, cache, _symmetric_like(C.val, rhs))
+    end
+    return nothing
+end
+
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_enzyme_forward(config, RT, X, A, C)
+end
+
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_enzyme_forward(config, RT, X, A, C)
+end
+
+function _lyapd_inplace_augmented_primal(
+        config::EnzymeRules.RevConfig, ::Type{RT}, X, A, C,
+    ) where {RT}
+    cache = lyapdfactor(A.val)
+    lyapd!(X.val, cache, C.val)
+    tape = (copy(X.val), cache, copy(A.val), A.val, C.val)
+    return EnzymeRules.AugmentedReturn(nothing, nothing, tape)
+end
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_augmented_primal(config, RT, X, A, C)
+end
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_augmented_primal(config, RT, X, A, C)
+end
+
+function _lyapd_inplace_enzyme_reverse(
+        config::EnzymeRules.RevConfig, ::Type{RT}, tape, X, A, C,
+    ) where {RT}
+    X_primal, cache, Aval, Aprimal, Cprimal = tape
+    N = EnzymeRules.width(config)
+    for i in 1:N
+        Xbar = N == 1 ? X.dval : X.dval[i]
+        Y = lyapdadjointsolve(cache, _symmetric_part_like(Cprimal, Xbar))
+
+        if !(typeof(C) <: Const)
+            dC = _shadow_ref(C, i, N)
+            _add_parameter_shadow!(Cprimal, dC, Y)
+        end
+        if !(typeof(A) <: Const)
+            dA = _shadow_ref(A, i, N)
+            tmp = Y * Aval
+            Abar = tmp * X_primal'
+            tmp = Y' * Aval
+            Abar .+= tmp * X_primal
+            _add_parameter_shadow!(Aprimal, dA, Abar)
+        end
+
+        fill!(Xbar, zero(eltype(Xbar)))
+    end
+    return (nothing, nothing, nothing)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        tape,
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_enzyme_reverse(config, RT, tape, X, A, C)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapd!)},
+        ::Type{RT},
+        tape,
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:Symmetric{T, <:StridedMatrix{T}}},
+    ) where {RT, T <: Union{Float32, Float64}}
+    return _lyapd_inplace_enzyme_reverse(config, RT, tape, X, A, C)
 end

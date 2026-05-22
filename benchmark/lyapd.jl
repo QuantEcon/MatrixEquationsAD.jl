@@ -66,6 +66,12 @@ end
 lyapd_loss(A, C, W) = dot(W, lyapd(A, C))
 lyapdkr_loss(A, C, W) = dot(W, lyapdkr(A, C))
 
+function lyapd_inplace_loss(A, C, W)
+    X = Matrix{eltype(A)}(undef, size(A))
+    lyapd!(X, A, C)
+    return dot(W, X)
+end
+
 function lyapd_group(problem)
     g = BenchmarkGroup()
 
@@ -171,6 +177,42 @@ function lyapdkr_group(problem)
     return g
 end
 
+# Chunked / batched AD lanes only for `lyapd!`. The primal write into a
+# preallocated `X` shares one `schur(A)` across all `N` partial directions /
+# tangent lanes, so the interesting cost is the multi-direction throughput.
+function lyapd_inplace_chunk_group(problem)
+    g = BenchmarkGroup()
+
+    g["forwarddiff_chunked"] = @benchmarkable lyapd_inplace_loss(A_dual, C_dual, W) setup = begin
+        A_dual = lyapd_dual_matrix($(problem.A), $(problem.A_tangents))
+        C_dual = lyapd_dual_matrix($(problem.C), $(problem.C_tangents))
+        W = $(problem.W)
+    end evals = 4
+
+    g["enzyme_batch_forward"] = @benchmarkable Enzyme.autodiff(
+        Forward, lyapd_inplace_loss, BatchDuplicated,
+        BatchDuplicated(A, A_tangents),
+        BatchDuplicated(C, C_tangents),
+        Const(W),
+    ) setup = begin
+        A = copy($(problem.A))
+        C = copy($(problem.C))
+        A_tangents = ntuple(Val($(length(problem.A_tangents)))) do i
+            tangent = make_zero(A)
+            copyto!(tangent, $(problem.A_tangents)[i])
+            tangent
+        end
+        C_tangents = ntuple(Val($(length(problem.C_tangents)))) do i
+            tangent = make_zero(C)
+            copyto!(tangent, $(problem.C_tangents)[i])
+            tangent
+        end
+        W = $(problem.W)
+    end evals = 4
+
+    return g
+end
+
 function lyapdkr_static_group(problem)
     g = BenchmarkGroup()
 
@@ -215,4 +257,7 @@ LYAPD_SUITE["lyapdkr"] = BenchmarkGroup()
 LYAPD_SUITE["lyapdkr"]["small"] = lyapdkr_group(lyapd_small)
 LYAPD_SUITE["lyapdkr"]["medium"] = lyapdkr_group(lyapd_medium)
 LYAPD_SUITE["lyapdkr"]["static_small"] = lyapdkr_static_group(lyapdkr_static_small)
+LYAPD_SUITE["lyapd!"] = BenchmarkGroup()
+LYAPD_SUITE["lyapd!"]["small"] = lyapd_inplace_chunk_group(lyapd_small)
+LYAPD_SUITE["lyapd!"]["medium"] = lyapd_inplace_chunk_group(lyapd_medium)
 LYAPD_SUITE

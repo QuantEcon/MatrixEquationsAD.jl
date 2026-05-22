@@ -10,8 +10,9 @@ using LinearAlgebra:
 
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
-    _lyapdkr_check!, _symmetrize_square!, klein_map, klein_map!, lyapdkr,
-    lyapdkrfactor, lyapdkrsolve
+    LyapDSchurCache, _lyapdkr_check!, _symmetrize_square!,
+    klein_map, klein_map!, lyapd!, lyapdfactor, lyapdkr, lyapdkrfactor,
+    lyapdkrsolve, lyapdsolve
 
 include("forwarddiff_lyapunov.jl")
 include("forwarddiff_lyapdkr.jl")
