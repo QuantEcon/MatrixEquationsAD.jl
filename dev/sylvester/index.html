@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Generalised Sylvester · MatrixEquationsAD.jl</title><meta name="title" content="Generalised Sylvester · MatrixEquationsAD.jl"/><meta property="og:title" content="Generalised Sylvester · MatrixEquationsAD.jl"/><meta property="twitter:title" content="Generalised Sylvester · MatrixEquationsAD.jl"/><meta name="description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="twitter:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/sylvester/"/><meta property="twitter:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/sylvester/"/><link rel="canonical" href="https://QuantEcon.github.io/MatrixEquationsAD.jl/sylvester/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MatrixEquationsAD.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../klein_map/">Klein Policy Map</a></li><li><a class="tocitem" href="../lyapd/">Discrete Lyapunov (Schur)</a></li><li><a class="tocitem" href="../lyapdkr/">Kronecker Discrete Lyapunov</a></li><li class="is-active"><a class="tocitem" href>Generalised Sylvester</a><ul class="internal"><li><a class="tocitem" href="#Primal"><span>Primal</span></a></li><li><a class="tocitem" href="#Worked-example"><span>Worked example</span></a></li><li><a class="tocitem" href="#ForwardDiff-/-Enzyme-JVP"><span>ForwardDiff / Enzyme JVP</span></a></li><li><a class="tocitem" href="#Enzyme-VJP"><span>Enzyme VJP</span></a></li><li><a class="tocitem" href="#Differentiating-through-gsylv"><span>Differentiating through <code>gsylv</code></span></a></li></ul></li><li><a class="tocitem" href="../ared/">Algebraic Riccati (DARE)</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Generalised Sylvester</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Generalised Sylvester</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/docs/src/sylvester.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Generalised-Sylvester"><a class="docs-heading-anchor" href="#Generalised-Sylvester">Generalised Sylvester</a><a id="Generalised-Sylvester-1"></a><a class="docs-heading-anchor-permalink" href="#Generalised-Sylvester" title="Permalink"></a></h1><p>Two <code>MatrixEquations.jl</code> solvers for the same equation:</p><ul><li><code>gsylv(A, B, C, D, E)</code> — Schur-based, <span>$O(n^3)$</span> per solve.</li><li><code>gsylvkr(A, B, C, D, E)</code> — Kronecker LU on the <span>$n^2 \times n^2$</span> operator.</li></ul><p>Both solve</p><p class="math-container">\[A\,X\,B \;+\; C\,X\,D \;=\; E.
+\tag{S}\]</p><p>Define the linear operator</p><p class="math-container">\[G[X] \;=\; A\,X\,B \;+\; C\,X\,D,\]</p><p>so (S) reads <span>$G[X] = E$</span>. <code>MatrixEquationsAD</code> provides ForwardDiff <code>Dual</code> dispatches and Enzyme forward / reverse rules for both front-ends; the rules share their tangent / adjoint derivations and differ only in which factorisation is cached.</p><p>Implementation pointers:</p><ul><li><code>ext/forwarddiff_sylvester.jl</code>, <code>ext/enzyme_sylvester.jl</code> — AD front-ends for <code>gsylv</code> and <code>gsylvkr</code>.</li></ul><h2 id="Primal"><a class="docs-heading-anchor" href="#Primal">Primal</a><a id="Primal-1"></a><a class="docs-heading-anchor-permalink" href="#Primal" title="Permalink"></a></h2><p><code>gsylv</code> uses the generalised-Schur (QZ) decompositions of <span>$(A, -C)$</span> and <span>$(D, B)$</span> from <a href="https://andreasvarga.github.io/MatrixEquations.jl/v2.4/sylvester.html#MatrixEquations.gsylv"><code>MatrixEquations.jl</code></a>; <code>gsylvkr</code> builds the Kronecker matrix <span>$B^\top \otimes A + D^\top \otimes C$</span> directly:</p><p class="math-container">\[\bigl(B^\top \otimes A + D^\top \otimes C\bigr)\,\operatorname{vec}(X)
+\;=\;
+\operatorname{vec}(E).\]</p><p>The factorisation assumption is that <span>$G$</span> is nonsingular — equivalently, the operator pairs <span>$(A - \lambda C)$</span> and <span>$(D + \lambda B)$</span> are regular and share no common eigenvalue (<code>MatrixEquations.jl</code> documents this requirement).</p><h2 id="Worked-example"><a class="docs-heading-anchor" href="#Worked-example">Worked example</a><a id="Worked-example-1"></a><a class="docs-heading-anchor-permalink" href="#Worked-example" title="Permalink"></a></h2><pre><code class="language-julia-repl hljs">julia&gt; using MatrixEquations: gsylv, gsylvkr
+
+julia&gt; using MatrixEquationsAD
+
+julia&gt; A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
+3×3 Matrix{Float64}:
+  4.0  0.1  0.0
+ -0.2  3.6  0.3
+  0.1  0.0  3.8
+
+julia&gt; B = [3.0 0.2; -0.1 2.7]
+2×2 Matrix{Float64}:
+  3.0  0.2
+ -0.1  2.7
+
+julia&gt; C = [0.2 0.0 0.0; 0.0 0.2 0.0; 0.0 0.0 0.2]
+3×3 Matrix{Float64}:
+ 0.2  0.0  0.0
+ 0.0  0.2  0.0
+ 0.0  0.0  0.2
+
+julia&gt; D = [0.3 0.0; 0.0 0.3]
+2×2 Matrix{Float64}:
+ 0.3  0.0
+ 0.0  0.3
+
+julia&gt; E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
+3×2 Matrix{Float64}:
+  1.0  -0.4
+  0.3   0.8
+ -0.2   0.5
+
+julia&gt; X = gsylv(A, B, C, D, E)
+3×2 Matrix{Float64}:
+  0.0805978  -0.0446488
+  0.0362012   0.072903
+ -0.017917    0.050781
+
+julia&gt; isapprox(A * X * B + C * X * D - E, zeros(3, 2); atol = 1.0e-12)
+true</code></pre><p><code>gsylvkr</code> returns the same solution up to round-off:</p><pre><code class="language-julia-repl hljs">julia&gt; gsylvkr(A, B, C, D, E) ≈ X
+true</code></pre><h2 id="ForwardDiff-/-Enzyme-JVP"><a class="docs-heading-anchor" href="#ForwardDiff-/-Enzyme-JVP">ForwardDiff / Enzyme JVP</a><a id="ForwardDiff-/-Enzyme-JVP-1"></a><a class="docs-heading-anchor-permalink" href="#ForwardDiff-/-Enzyme-JVP" title="Permalink"></a></h2><p>Differentiating (S) gives</p><p class="math-container">\[G[d X]
+\;=\;
+d E
+\;-\; d A\,X\,B \;-\; A\,X\,d B
+\;-\; d C\,X\,D \;-\; C\,X\,d D.\]</p><p><code>gsylv</code> caches its generalised-Schur factors and reuses them for every chunked-<code>Dual</code> partial direction or Enzyme <code>BatchDuplicated</code> tangent. <code>gsylvkr</code> caches the LU factorisation of <span>$B^\top \otimes A + D^\top \otimes C$</span>; chunked tangents are <span>$N$</span> back-substitutions against that LU.</p><h2 id="Enzyme-VJP"><a class="docs-heading-anchor" href="#Enzyme-VJP">Enzyme VJP</a><a id="Enzyme-VJP-1"></a><a class="docs-heading-anchor-permalink" href="#Enzyme-VJP" title="Permalink"></a></h2><p>Solve the adjoint generalised Sylvester equation</p><p class="math-container">\[G^*[Y]
+\;=\;
+A^\top\,Y\,B^\top \;+\; C^\top\,Y\,D^\top
+\;=\;
+\bar X.\]</p><p>Then</p><p class="math-container">\[\bar E \;\mathrel{+}=\; Y,\]</p><p>and</p><p class="math-container">\[\begin{aligned}
+\bar A &amp;\mathrel{-}= Y\,B^\top\,X^\top, \\
+\bar B &amp;\mathrel{-}= X^\top\,A^\top\,Y, \\
+\bar C &amp;\mathrel{-}= Y\,D^\top\,X^\top, \\
+\bar D &amp;\mathrel{-}= X^\top\,C^\top\,Y.
+\end{aligned}\]</p><p>The two implementations share these formulas; only the cached factorisation differs (Schur factors for <code>gsylv</code>, Kronecker LU for <code>gsylvkr</code>).</p><h2 id="Differentiating-through-gsylv"><a class="docs-heading-anchor" href="#Differentiating-through-gsylv">Differentiating through <code>gsylv</code></a><a id="Differentiating-through-gsylv-1"></a><a class="docs-heading-anchor-permalink" href="#Differentiating-through-gsylv" title="Permalink"></a></h2><pre><code class="language-julia hljs">using Enzyme: Active, Const, Duplicated, Reverse, autodiff, make_zero
+using LinearAlgebra: dot
+using MatrixEquations: gsylv
+using MatrixEquationsAD
+
+A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
+B = [3.0  0.2; -0.1 2.7]
+C = [0.2 0.0 0.0; 0.0 0.2 0.0; 0.0 0.0 0.2]
+D = [0.3 0.0; 0.0 0.3]
+E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
+W = [0.7 -0.1; -0.2 0.4; 0.5 0.3]
+
+weighted(A, B, C, D, E, W) = dot(W, gsylv(A, B, C, D, E))
+
+dA = make_zero(A); dB = make_zero(B)
+dC = make_zero(C); dD = make_zero(D); dE = make_zero(E)
+autodiff(
+    Reverse, weighted, Active,
+    Duplicated(A, dA), Duplicated(B, dB),
+    Duplicated(C, dC), Duplicated(D, dD),
+    Duplicated(E, dE), Const(W),
+)
+# dA, dB, dC, dD, dE now hold the gradients.</code></pre><p>References:</p><ul><li>MatrixEquations.jl documents <code>gsylv</code> as solving <span>$A X B + C X D = E$</span> in its <a href="https://andreasvarga.github.io/MatrixEquations.jl/v2.4/sylvester.html">Sylvester solver documentation</a>; <code>gsylvkr</code> is the Kronecker variant.</li><li>LAPACK&#39;s <a href="https://www.netlib.org/lapack/explore-html/d4/d3b/group__tgsyl_ga96eff9d077e7600c68cd18246ca4cdc3.html">DTGSYL</a> documents the generalised Sylvester systems used in Schur-based solvers and their transposed forms.</li><li>Kao and Hennequin derive AD rules for Sylvester-type equations in <a href="https://arxiv.org/abs/2011.11430">arXiv:2011.11430</a>.</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../lyapdkr/">« Kronecker Discrete Lyapunov</a><a class="docs-footer-nextpage" href="../ared/">Algebraic Riccati (DARE) »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 22 May 2026 22:22">Friday 22 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
