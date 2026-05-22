@@ -13,7 +13,9 @@ include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "fvgq.jl
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sw07.jl"))
 
 function klein_small_problem(threshold, n_tangents)
-    A, B, n_x = RBCExampleMatrices.dp_rbc_first_order_gschur()
+    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n_y = size(A, 1) - n_x
     A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
     B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
@@ -23,7 +25,9 @@ function klein_small_problem(threshold, n_tangents)
 end
 
 function klein_medium_problem(threshold, n_tangents)
-    A, B, n_x = SGUExampleMatrices.dp_sgu_first_order_gschur()
+    (; A_schur, B_schur, n_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n_y = size(A, 1) - n_x
     A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
     B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
@@ -33,9 +37,9 @@ function klein_medium_problem(threshold, n_tangents)
 end
 
 function klein_fvgq_problem(threshold, n_tangents)
-    A = FVGQExampleMatrices.fvgq_klein_gschur_A()
-    B = FVGQExampleMatrices.fvgq_klein_gschur_B()
-    n_x = 14
+    (; A_schur, B_schur, n_x) = FVGQExampleMatrices.dp_fvgq_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n_y = size(A, 1) - n_x
     A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
     B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
@@ -45,7 +49,9 @@ function klein_fvgq_problem(threshold, n_tangents)
 end
 
 function klein_sw07pfeifer_problem(threshold, n_tangents)
-    A, B, n_x = SW07ExampleMatrices.dp_sw07pfeifer_first_order_gschur()
+    (; A_schur, B_schur, n_x) = SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n_y = size(A, 1) - n_x
     A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
     B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
@@ -55,7 +61,9 @@ function klein_sw07pfeifer_problem(threshold, n_tangents)
 end
 
 function klein_static_small_problem(threshold, n_tangents)
-    A, B, n_x = RBCExampleMatrices.dp_rbc_first_order_gschur()
+    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n = size(A, 1)
     n_y = n - n_x
     As = SMatrix{n, n, Float64}(A)
