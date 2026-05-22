@@ -426,7 +426,9 @@ In the Schur frame ``\tilde X = Q_y^\top d g_x\, Q_h`` it becomes
 S_y\,\tilde X\,S_h \;+\; \tilde X \;=\; Q_y^\top Y_y Q_h,
 ```
 
-solved in place by `MatrixEquations.sylvds!`. Back-transforming and
+solved in place by `MatrixEquations.sylvds!`, whose convention is
+``S_y\,X\,S_h + X = \text{RHS}`` (or the transposed form when
+`adjA = adjB = true`). Back-transforming and
 substituting into the ``h_x`` block,
 
 ```math
@@ -621,8 +623,12 @@ through the Klein algebra. The package does not, for four reasons:
   motivates the BK ordering used in `klein_map`.
 - Blanchard, O. and Kahn, C. (1980). *The solution of linear difference
   models under rational expectations.*
-  [DOI:10.2307/1912186](https://doi.org/10.2307/1912186). Source of the
-  ``|\alpha_i| \ge (1 - \tau)|\beta_i|`` selection rule used here.
+  [DOI:10.2307/1912186](https://doi.org/10.2307/1912186). Original
+  saddle-path count condition (the number of explosive generalised
+  eigenvalues must equal ``n_x``). The soft threshold
+  ``|\alpha_i| \ge (1 - \tau)|\beta_i|`` is an implementation choice
+  that approximates ``|\alpha_i| > |\beta_i|`` with numerical
+  tolerance; it does not come from the 1980 paper.
 - Kao, T.-T. and Hennequin, M. (2020). *Automatic differentiation of
   Sylvester, Lyapunov, and algebraic Riccati equations.*
   [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). General

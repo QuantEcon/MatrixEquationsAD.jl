@@ -209,5 +209,10 @@ References:
   [Riccati solver documentation](https://andreasvarga.github.io/MatrixEquations.jl/dev/riccati.html).
 - Arnold and Laub's generalised-eigenproblem method:
   [DOI:10.1109/PROC.1984.13083](https://doi.org/10.1109/PROC.1984.13083).
-- Kao and Hennequin derive AD rules for algebraic Riccati equations in
-  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430).
+- Kao, T.-T. and Hennequin, M. (2020). *Automatic differentiation of
+  Sylvester, Lyapunov, and algebraic Riccati equations.*
+  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). The general
+  implicit-function recipe used here is the one applied there to the
+  *continuous* algebraic Riccati equation; the discrete-time formulas
+  in this section are derived in-house against the closed-loop Lyapunov
+  operator ``L_{A_c}[\cdot]``.

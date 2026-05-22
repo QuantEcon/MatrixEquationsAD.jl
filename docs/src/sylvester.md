@@ -32,7 +32,7 @@ Implementation pointers:
 ## Primal
 
 `gsylv` uses the generalised-Schur (QZ) decompositions of
-``(A, -C)`` and ``(D, B)`` from
+``(A, C)`` and ``(B, D)`` from
 [`MatrixEquations.jl`](https://andreasvarga.github.io/MatrixEquations.jl/v2.4/sylvester.html#MatrixEquations.gsylv);
 `gsylvkr` builds the Kronecker matrix
 ``B^\top \otimes A + D^\top \otimes C`` directly:
@@ -112,8 +112,8 @@ d E
 \;-\; d C\,X\,D \;-\; C\,X\,d D.
 ```
 
-`gsylv` caches its generalised-Schur factors of the pairs ``(A, -C)``
-and ``(D, B)`` on the value layer and reuses them for every
+`gsylv` caches its generalised-Schur factors of the pairs ``(A, C)``
+and ``(B, D)`` on the value layer and reuses them for every
 chunked-`Dual` partial direction or Enzyme `BatchDuplicated` tangent —
 each lane is one triangular sweep against the shared Schur factors.
 `gsylvkr` caches the LU factorisation of
