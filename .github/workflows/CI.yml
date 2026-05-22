@@ -37,3 +37,75 @@ jobs:
       - uses: julia-actions/cache@v3
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
+  docs-changes:
+    name: Documentation changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      docs: ${{ steps.changes.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - id: changes
+        name: Check documentation inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="HEAD"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          if [[ -z "$base" || "$base" == "0000000000000000000000000000000000000000" ]]; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git diff --name-only "$base" "$head" > changed-files.txt
+          if grep -Eq '^(docs/|src/|ext/|Project\.toml$|Manifest\.toml$|\.github/workflows/CI\.yml$)' changed-files.txt; then
+            echo "docs=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "docs=false" >> "$GITHUB_OUTPUT"
+          fi
+  docs:
+    name: Documentation
+    needs: docs-changes
+    if: needs.docs-changes.outputs.docs == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: read
+      statuses: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: julia-actions/setup-julia@v3
+        with:
+          version: '1.12'
+      - uses: julia-actions/cache@v3
+      - name: Instantiate docs
+        run: julia --project=docs --color=yes -e 'using Pkg; Pkg.instantiate()'
+      - name: Build and deploy docs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia --project=docs --color=yes docs/make.jl
+      - name: Run doctests
+        shell: julia --project=docs --color=yes {0}
+        run: |
+          using Documenter: DocMeta, doctest
+          using MatrixEquationsAD
+          DocMeta.setdocmeta!(MatrixEquationsAD, :DocTestSetup, :(using MatrixEquationsAD); recursive = true)
+          doctest(MatrixEquationsAD)
