@@ -1,0 +1,10 @@
+[deps]
+DifferentiationInterface = "a0c0ee7d-e4b9-4e03-894e-1c5f64a51d63"
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+Enzyme = "7da242da-08ed-463a-9acd-ee780be4f1d9"
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+MatrixEquations = "99c1a7ee-ab34-5fd5-8076-27c950a045f4"
+MatrixEquationsAD = "283a1a7b-c18a-432b-b100-bdc256e73a32"
+
+[compat]
+Documenter = "1"
