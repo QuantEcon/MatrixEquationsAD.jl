@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Klein Policy Map · MatrixEquationsAD.jl</title><meta name="title" content="Klein Policy Map · MatrixEquationsAD.jl"/><meta property="og:title" content="Klein Policy Map · MatrixEquationsAD.jl"/><meta property="twitter:title" content="Klein Policy Map · MatrixEquationsAD.jl"/><meta name="description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="twitter:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/klein_map/"/><meta property="twitter:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/klein_map/"/><link rel="canonical" href="https://QuantEcon.github.io/MatrixEquationsAD.jl/klein_map/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MatrixEquationsAD.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li class="is-active"><a class="tocitem" href>Klein Policy Map</a><ul class="internal"><li><a class="tocitem" href="#Where-the-Primal-Comes-From"><span>Where the Primal Comes From</span></a></li><li><a class="tocitem" href="#Algorithm"><span>Algorithm</span></a></li><li><a class="tocitem" href="#Post-Conditions"><span>Post-Conditions</span></a></li><li><a class="tocitem" href="#Why-AD-Rules-Operate-on-(F),-Not-on-the-QZ-Factors"><span>Why AD Rules Operate on (F), Not on the QZ Factors</span></a></li><li><a class="tocitem" href="#Jacobian-of-the-Implicit-Equation"><span>Jacobian of the Implicit Equation</span></a></li><li><a class="tocitem" href="#Big-K-Factorisation-(OOP-klein_map)"><span>Big-K Factorisation (OOP <code>klein_map</code>)</span></a></li><li><a class="tocitem" href="#Reduced-Sylvester-Factorisation-(in-place-klein_map!)"><span>Reduced-Sylvester Factorisation (in-place <code>klein_map!</code>)</span></a></li><li><a class="tocitem" href="#Which-Path-Wins"><span>Which Path Wins</span></a></li><li><a class="tocitem" href="#SMatrix-Dispatch"><span>SMatrix Dispatch</span></a></li><li><a class="tocitem" href="#Examples"><span>Examples</span></a></li></ul></li><li><a class="tocitem" href="../lyapd/">Discrete Lyapunov (Schur)</a></li><li><a class="tocitem" href="../lyapdkr/">Kronecker Discrete Lyapunov</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Klein Policy Map</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Klein Policy Map</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/docs/src/klein_map.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Klein-Policy-Map"><a class="docs-heading-anchor" href="#Klein-Policy-Map">Klein Policy Map</a><a id="Klein-Policy-Map-1"></a><a class="docs-heading-anchor-permalink" href="#Klein-Policy-Map" title="Permalink"></a></h1><p><code>klein_map(A, B; threshold)</code> returns the Klein/Sims first-order policy <span>$(g_x, h_x)$</span> for a DSGE pencil <span>$(A, B)$</span> with the Blanchard-Kahn selection at margin <span>$\tau = \texttt{threshold}$</span>. Two API forms exist:</p><ul><li><code>klein_map(A, B; threshold)</code> — heap-allocated, returns a NamedTuple <code>(; g_x, h_x)</code>.</li><li><code>klein_map!(g_x, h_x, A, B; threshold)</code> — mutating, writes into caller-supplied buffers; the in-place AD rules use a more memory-efficient reduced-Sylvester factorization.</li></ul><p>Implementation pointers:</p><ul><li><code>src/klein_map.jl</code> — primal solve via ordered generalized Schur (BK ordering on <code>|α| ≥ (1 − τ)|β|</code>) followed by the Klein/Sims algebra.</li><li><code>ext/klein_map_derivatives.jl</code> — <code>_klein_bigk_plan</code> / <code>_klein_bigk_jvp</code> / <code>_klein_bigk_vjp</code> for the OOP path; <code>_klein_structured_plan</code> / <code>_klein_structured_jvp</code> / <code>_klein_structured_vjp</code> for the in-place path.</li><li><code>ext/enzyme_klein_map.jl</code> and <code>ext/forwarddiff_klein_map.jl</code> — the AD frontends.</li></ul><h2 id="Where-the-Primal-Comes-From"><a class="docs-heading-anchor" href="#Where-the-Primal-Comes-From">Where the Primal Comes From</a><a id="Where-the-Primal-Comes-From-1"></a><a class="docs-heading-anchor-permalink" href="#Where-the-Primal-Comes-From" title="Permalink"></a></h2><p>Consider the linearised equilibrium of a DSGE model around a deterministic steady state. Partition the state into <span>$n_x$</span> predetermined variables <span>$x_t$</span> and <span>$n_y$</span> non-predetermined (jump) variables <span>$y_t$</span>, and write <span>$z_t = [x_t;\, y_t] \in \mathbb{R}^{n}$</span> with <span>$n = n_x + n_y$</span>. The linearised model can be cast in the pencil form</p><p class="math-container">\[A\,\mathbb{E}_t[z_{t+1}] \;+\; B\,z_t \;=\; 0,
+\qquad
+A, B \in \mathbb{R}^{n \times n}.\]</p><p>Klein (2000) shows that the unique bounded solution under the Blanchard-Kahn condition takes the linear form</p><p class="math-container">\[y_t \;=\; g_x\, x_t,
+\qquad
+x_{t+1} \;=\; h_x\, x_t \;+\; \text{(shock terms)},\]</p><p>i.e. the jumps are an affine function of the predetermined state, and the predetermined state follows an autonomous linear law of motion. The package&#39;s <code>klein_map(A, B; threshold)</code> returns exactly that <span>$(g_x, h_x)$</span>.</p><h2 id="Algorithm"><a class="docs-heading-anchor" href="#Algorithm">Algorithm</a><a id="Algorithm-1"></a><a class="docs-heading-anchor-permalink" href="#Algorithm" title="Permalink"></a></h2><p>Stacked column-wise as <span>$z = [x;\,y]$</span>, define the embedding</p><p class="math-container">\[\Psi
+=
+\begin{bmatrix}
+I_{n_x} \\
+g_x
+\end{bmatrix}
+\in \mathbb{R}^{n \times n_x},\]</p><p>so that <span>$z_t = \Psi\,x_t$</span> under the policy, and <span>$z_{t+1} = \Psi\,h_x\,x_t$</span>. Substituting into the pencil equation,</p><p class="math-container">\[A\,\Psi\,h_x\,x_t \;+\; B\,\Psi\,x_t \;=\; 0
+\qquad \text{for all } x_t,\]</p><p>which is the implicit policy equation</p><p class="math-container">\[F(A, B, g_x, h_x)
+\;:=\;
+A\,\Psi\, h_x \;+\; B\,\Psi
+\;=\;
+0
+\quad\in\;\mathbb{R}^{n \times n_x}.
+\tag{F}\]</p><p><code>klein_map</code> constructs the solution by Klein&#39;s QZ-based procedure:</p><ol><li>Take the real generalised Schur decomposition <span>$A = Q\, S\, Z^{\!\top}$</span>, <span>$B = Q\, T\, Z^{\!\top}$</span> with <span>$Q$</span>, <span>$Z$</span> orthogonal, <span>$S$</span> quasi-upper-triangular, <span>$T$</span> upper triangular. Eigenvalues are the pairs <span>$(\alpha_i,\beta_i)$</span>.</li><li>Reorder so that the <em>unstable</em> generalised eigenvalues (<span>$|\alpha_i| \ge (1 - \tau)|\beta_i|$</span>) come first. <span>$\tau$</span> is the <code>threshold</code> keyword; the BK count <span>$n_x$</span> is the number of selected eigenvalues and must equal the predetermined-block dimension.</li><li>Partition into <span>$b = 1\!:\!n_x$</span> (unstable, &quot;big&quot;) and <span>$l = (n_x+1)\!:\!n$</span> (stable) blocks, and read off<p class="math-container">\[g_x \;=\; -\,Z_{l l}^{-\!\top}\, Z_{b l}^{\!\top},
+\qquad
+h_x \;=\; -\,\mathrm{blob}^{-1}\, S_{b b}^{-1}\, T_{b b}\,\mathrm{blob},
+\quad
+\mathrm{blob} \;=\; Z_{b b}^{\!\top} \;+\; Z_{l b}^{\!\top}\,g_x.\]</p></li></ol><p>The construction is a direct port of <code>DifferentiablePerturbation.jl</code>&#39;s <code>first_order_perturbation!</code>; see <code>src/klein_map.jl</code> for the indexing.</p><h2 id="Post-Conditions"><a class="docs-heading-anchor" href="#Post-Conditions">Post-Conditions</a><a id="Post-Conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Post-Conditions" title="Permalink"></a></h2><p>At the policy returned by <code>klein_map</code>, the following hold (each is unit-tested on the RBC, RBC_SV, SGU, FVGQ, and SW07PFEIFER fixtures):</p><ul><li><strong>Implicit policy residual:</strong> <span>$F(A, B, g_x, h_x) = A\,\Psi\,h_x + B\,\Psi = 0$</span> in floating-point arithmetic (typical residual is below <span>$10^{-8}$</span> on the standard fixtures and is what <code>test/test_klein_map.jl</code> checks).</li><li><strong>Saddle-path:</strong> every <span>$x_0 \in \mathbb{R}^{n_x}$</span> generates a bounded trajectory <span>$z_t = \Psi\, h_x^{\,t}\, x_0$</span>.</li><li><strong>Stable transition:</strong> the spectrum of <span>$h_x$</span> lies strictly inside the unit disc (<span>$\rho(h_x) &lt; 1$</span>), with eigenvalues equal to the stable generalised eigenvalues <span>$\beta_i/\alpha_i$</span> of the inverse pencil.</li><li><strong>Static algebraic post-conditions</strong> (consequences of the QZ structure the algorithm reads off): <span>$Z_{l l}^{\!\top}\, g_x \;=\; -\,Z_{b l}^{\!\top}$</span> and <span>$\mathrm{blob}\, h_x \;=\; -\,S_{b b}^{-1}\, T_{b b}\,\mathrm{blob}$</span>.</li></ul><p>The factorisation assumptions for the AD rules below are:</p><ul><li>the BK split returns exactly <span>$n_x$</span> unstable eigenvalues with <span>$0 &lt; n_x &lt; n$</span>;</li><li><span>$Z_{l l}$</span> and <span>$\mathrm{blob}$</span> are nonsingular (used in the primal);</li><li>the linearisation of <span>$F$</span> (the Jacobian <span>$K$</span> below) is nonsingular at the primal solution.</li></ul><p>Failures throw <code>ErrorException</code> (BK / consistency check) or the underlying LAPACK exception (Schur / LU).</p><p>Calling <code>klein_map</code> on the canonical RBC pencil (assembled by <code>RBCExampleMatrices.rbc_first_order_assembly(p)</code> from <a href="https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/test/example_matrices/rbc.jl"><code>test/example_matrices/rbc.jl</code></a>, itself a readable translation of <a href="https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl/blob/main/src/models/RBC_generated/first_order_ip.jl"><code>DifferentiablePerturbation.jl</code>&#39;s code-generated <code>RBC.first_order_assembly!</code></a>):</p><pre><code class="language-julia-repl hljs">julia&gt; using MatrixEquationsAD
+
+julia&gt; include(joinpath(pkgdir(MatrixEquationsAD), &quot;test&quot;, &quot;example_matrices&quot;, &quot;rbc.jl&quot;));
+
+julia&gt; using .RBCExampleMatrices: rbc_first_order_assembly
+
+julia&gt; A, B, n_x = rbc_first_order_assembly([0.5, 0.95, 0.2, 0.02, 0.01, 0.01]);
+
+julia&gt; r = klein_map(A, B; threshold = 1.0e-6);
+
+julia&gt; size(r.g_x), size(r.h_x)
+((3, 2), (2, 2))</code></pre><p><code>r.g_x[1, 2]</code> is the static response of consumption to a TFP innovation; <code>r.h_x[1, 2]</code> is how a TFP shock propagates into next period&#39;s capital.</p><h2 id="Why-AD-Rules-Operate-on-(F),-Not-on-the-QZ-Factors"><a class="docs-heading-anchor" href="#Why-AD-Rules-Operate-on-(F),-Not-on-the-QZ-Factors">Why AD Rules Operate on (F), Not on the QZ Factors</a><a id="Why-AD-Rules-Operate-on-(F),-Not-on-the-QZ-Factors-1"></a><a class="docs-heading-anchor-permalink" href="#Why-AD-Rules-Operate-on-(F),-Not-on-the-QZ-Factors" title="Permalink"></a></h2><p>In principle one could compute <span>$(\bar A, \bar B)$</span> by differentiating the generalised-Schur factors <span>$(S, T, Q, Z)$</span> and then back-propagating through the Klein algebra. We do <strong>not</strong> do that, and the docs derive the AD rules directly from the implicit residual <span>$(F)$</span>. The reasons:</p><ul><li><strong>The QZ factors are not unique.</strong> Within each repeated or clustered eigenvalue group, <span>$Q$</span> and <span>$Z$</span> admit a gauge freedom: any orthogonal transformation that commutes with the Schur block structure leaves <span>$(S, T)$</span> unchanged. The tangent of <span>$(Q, Z)$</span> is therefore ill-defined precisely where eigenvalues coalesce — e.g. the FVGQ pencil has multiple clusters at <span>$|\alpha/\beta| = 1$</span>.</li><li><strong>Block structure changes are discontinuous.</strong> Real-Schur <span>$S$</span> mixes <span>$1\times 1$</span> real blocks with <span>$2\times 2$</span> complex-conjugate blocks. A perturbation that pushes a real pair into a complex pair (or vice versa) changes the block layout discontinuously. The reordering step that enforces the BK selection has the same issue at threshold crossings.</li><li><strong>Klein&#39;s policy <span>$(g_x, h_x)$</span> is gauge-invariant.</strong> It depends only on the <em>stable deflating subspace</em>, not on the particular orthogonal basis chosen for it. Differentiating <span>$(F)$</span> reflects that invariance: the tangents <span>$(dg_x, dh_x)$</span> are uniquely defined even when <span>$(dQ, dZ)$</span> are not.</li><li><strong>The QZ-tangent rule needs perturbation theory the IFT does not.</strong> The implicit-function theorem applied to <span>$(F)$</span> only requires nonsingularity of the linearised operator <span>$K$</span> below, which holds generically; the QZ-tangent approach needs eigenvalue/eigenvector perturbation bounds that degrade as clusters tighten.</li></ul><p>So the AD rules differentiate <span>$(F)$</span> itself. The locally constant ingredients (BK selection, real-vs-complex block layout, threshold position) are treated as fixed; the assumption is that no eigenvalue crosses the threshold under perturbation.</p><h2 id="Jacobian-of-the-Implicit-Equation"><a class="docs-heading-anchor" href="#Jacobian-of-the-Implicit-Equation">Jacobian of the Implicit Equation</a><a id="Jacobian-of-the-Implicit-Equation-1"></a><a class="docs-heading-anchor-permalink" href="#Jacobian-of-the-Implicit-Equation" title="Permalink"></a></h2><p>Let <span>$E_y = [\,0_{n_x \times n_y};\, I_{n_y}\,] \in \mathbb{R}^{n \times n_y}$</span>, and split the columns of <span>$A$</span> and <span>$B$</span> as <span>$A_2 = A E_y$</span>, <span>$B_2 = B E_y$</span> (the trailing <span>$n_y$</span> columns). Differentiating <span>$F = 0$</span> at fixed <span>$(A, B)$</span> gives</p><p class="math-container">\[A\Psi\,dh_x
+\;+\;
+\bigl(A_2 \, dg_x \, h_x + B_2 \, dg_x\bigr)
+\;=\;
+-\,dA\,D - dB\,\Psi.\]</p><p>Vectorising column-major and stacking the unknowns as <span>$[\operatorname{vec}(dh_x);\,\operatorname{vec}(dg_x)] \in \mathbb{R}^{n n_x}$</span>,</p><p class="math-container">\[K
+\begin{bmatrix}
+\operatorname{vec}(dh_x) \\
+\operatorname{vec}(dg_x)
+\end{bmatrix}
+\;=\;
+-\operatorname{vec}\!\bigl(dA\,D + dB\,\Psi\bigr),\]</p><p>with</p><p class="math-container">\[K
+\;=\;
+\Bigl[\,
+I_{n_x}\otimes A\Psi
+\;\Big|\;
+h_x^{\!\top}\otimes A_2 \;+\; I_{n_x}\otimes B_2
+\,\Bigr]
+\;\in\;\mathbb{R}^{n n_x \times n n_x}.\]</p><p>Two equivalent linear-algebra representations are implemented and produce identical tangents up to floating-point roundoff. Both are correct on degenerate-cluster pencils (e.g. the FVGQ fixture) because they differentiate the implicit equation rather than the non-unique QZ factors.</p><h2 id="Big-K-Factorisation-(OOP-klein_map)"><a class="docs-heading-anchor" href="#Big-K-Factorisation-(OOP-klein_map)">Big-K Factorisation (OOP <code>klein_map</code>)</a><a id="Big-K-Factorisation-(OOP-klein_map)-1"></a><a class="docs-heading-anchor-permalink" href="#Big-K-Factorisation-(OOP-klein_map)" title="Permalink"></a></h2><p>The OOP rule builds <span>$K$</span> once as a dense <span>$(n n_x) \times (n n_x)$</span> block matrix and stores its LU factorisation in the plan returned by <code>_klein_bigk_plan</code>. Both forward and reverse modes reuse this single factorisation.</p><h3 id="ForwardDiff-/-Enzyme-JVP"><a class="docs-heading-anchor" href="#ForwardDiff-/-Enzyme-JVP">ForwardDiff / Enzyme JVP</a><a id="ForwardDiff-/-Enzyme-JVP-1"></a><a class="docs-heading-anchor-permalink" href="#ForwardDiff-/-Enzyme-JVP" title="Permalink"></a></h3><p>For each tangent direction <span>$(dA, dB)$</span>,</p><p class="math-container">\[\begin{bmatrix}
+\operatorname{vec}(dh_x) \\
+\operatorname{vec}(dg_x)
+\end{bmatrix}
+\;=\;
+K^{-1}\,\operatorname{vec}\!\bigl(-(dA\,D + dB\,\Psi)\bigr).\]</p><p><code>_klein_bigk_jvp</code> forms the right-hand side <span>$R = -(dA\,D + dB\,\Psi)$</span>, performs one LU back-substitution, and reshapes the solution into <span>$(dh_x, dg_x)$</span>. ForwardDiff chunks of width <span>$N$</span> and Enzyme <code>BatchDuplicated</code> of width <span>$N$</span> both issue <span>$N$</span> such back-substitutions against the shared factorisation.</p><h3 id="Enzyme-VJP"><a class="docs-heading-anchor" href="#Enzyme-VJP">Enzyme VJP</a><a id="Enzyme-VJP-1"></a><a class="docs-heading-anchor-permalink" href="#Enzyme-VJP" title="Permalink"></a></h3><p>Pack the output cotangents in the same block order as <span>$K$</span>:</p><p class="math-container">\[u
+=
+\begin{bmatrix}
+\operatorname{vec}(\bar h_x) \\
+\operatorname{vec}(\bar g_x)
+\end{bmatrix}
+\;\in\;\mathbb{R}^{n n_x},
+\qquad
+\lambda = K^{-\!\top} u,
+\qquad
+\Lambda = \operatorname{reshape}(\lambda,\, n,\, n_x).\]</p><p>Because the residual <span>$R$</span> depends on <span>$A$</span> and <span>$B$</span> only through <span>$R = -(dA\,D + dB\,\Psi)$</span>, the parameter cotangents are</p><p class="math-container">\[\bar A
+\;\mathrel{+}=\;
+-\,\Lambda\,D^{\!\top}
+\;=\;
+-\,\Lambda\,h_x^{\!\top}\,\Psi^{\!\top},
+\qquad
+\bar B
+\;\mathrel{+}=\;
+-\,\Lambda\,\Psi^{\!\top}.\]</p><p><code>_klein_bigk_vjp</code> performs the single transposed LU solve, reshapes <span>$\lambda$</span>, and applies these outer products.</p><h2 id="Reduced-Sylvester-Factorisation-(in-place-klein_map!)"><a class="docs-heading-anchor" href="#Reduced-Sylvester-Factorisation-(in-place-klein_map!)">Reduced-Sylvester Factorisation (in-place <code>klein_map!</code>)</a><a id="Reduced-Sylvester-Factorisation-(in-place-klein_map!)-1"></a><a class="docs-heading-anchor-permalink" href="#Reduced-Sylvester-Factorisation-(in-place-klein_map!)" title="Permalink"></a></h2><p>The in-place rule never materialises the full <span>$K$</span>. It instead builds the <span>$n \times n$</span> block</p><p class="math-container">\[C_0
+=
+\begin{bmatrix}
+A\Psi &amp; B_2
+\end{bmatrix}
+\;\in\;\mathbb{R}^{n \times n},\]</p><p>LU-factorises <span>$C_0$</span>, solves once for the auxiliary matrix <span>$J = C_0^{-1} A E_y \in \mathbb{R}^{n \times n_y}$</span>, and splits it into</p><p class="math-container">\[J
+=
+\begin{bmatrix}
+J_x \\
+J_y
+\end{bmatrix},
+\qquad
+J_x \in \mathbb{R}^{n_x \times n_y},
+\qquad
+J_y \in \mathbb{R}^{n_y \times n_y}.\]</p><p>Real Schur factorisations <span>$J_y = Q_y S_y Q_y^{\!\top}$</span> and <span>$h_x = Q_h S_h Q_h^{\!\top}$</span> are computed once and reused.</p><h3 id="JVP"><a class="docs-heading-anchor" href="#JVP">JVP</a><a id="JVP-1"></a><a class="docs-heading-anchor-permalink" href="#JVP" title="Permalink"></a></h3><p>Let <span>$Y = C_0^{-1} R$</span> with <span>$R = -(dA\,D + dB\,\Psi)$</span>, and split <span>$Y = [Y_x;\,Y_y]$</span>. Premultiplying the tangent equation by <span>$C_0^{-1}$</span> and matching block rows gives</p><p class="math-container">\[\boxed{\;\;
+dg_x \;+\; J_y\,dg_x\,h_x \;=\; Y_y
+\;\;}\]</p><p>which is a discrete Sylvester / Stein equation. In the Schur frame <span>$\tilde X = Q_y^{\!\top} dg_x\, Q_h$</span> it becomes</p><p class="math-container">\[S_y\,\tilde X\,S_h \;+\; \tilde X \;=\; Q_y^{\!\top} Y_y Q_h,\]</p><p>solved in place by <code>MatrixEquations.sylvds!</code>. Back-transforming and substituting into the <span>$h_x$</span> block,</p><p class="math-container">\[dh_x \;=\; Y_x \;-\; J_x\,dg_x\,h_x.\]</p><h3 id="VJP"><a class="docs-heading-anchor" href="#VJP">VJP</a><a id="VJP-1"></a><a class="docs-heading-anchor-permalink" href="#VJP" title="Permalink"></a></h3><p>Given output cotangents <span>$(\bar g_x, \bar h_x)$</span>, the elimination above flows backwards as follows. The <span>$dh_x$</span> formula contributes to <span>$\bar Y_x$</span> and induces a correction on the <span>$dg_x$</span> cotangent:</p><p class="math-container">\[\bar Y_x \;=\; \bar h_x,
+\qquad
+\tilde{\bar g}_x
+\;=\;
+\bar g_x \;-\; J_x^{\!\top}\,\bar h_x\,h_x^{\!\top}.\]</p><p>The corrected <span>$\tilde{\bar g}_x$</span> is the right-hand side of the adjoint Stein equation</p><p class="math-container">\[J_y^{\!\top}\,Z\,h_x^{\!\top} \;+\; Z \;=\; \tilde{\bar g}_x,
+\qquad
+\bar Y_y \;=\; Z,\]</p><p>again solved with <code>sylvds!(S_y, S_h, ⋅; adjA = true, adjB = true)</code> in Schur coordinates. Reassembling</p><p class="math-container">\[\bar Y
+=
+\begin{bmatrix}
+\bar h_x \\
+Z
+\end{bmatrix},
+\qquad
+\Lambda \;=\; C_0^{-\!\top}\,\bar Y,\]</p><p>requires one transposed LU back-substitution against the same <span>$C_0$</span> factorisation. The parameter cotangents are then identical to the big-K form:</p><p class="math-container">\[\bar A
+\;\mathrel{+}=\;
+-\,\Lambda\,h_x^{\!\top}\,\Psi^{\!\top},
+\qquad
+\bar B
+\;\mathrel{+}=\;
+-\,\Lambda\,\Psi^{\!\top}.\]</p><h2 id="Which-Path-Wins"><a class="docs-heading-anchor" href="#Which-Path-Wins">Which Path Wins</a><a id="Which-Path-Wins-1"></a><a class="docs-heading-anchor-permalink" href="#Which-Path-Wins" title="Permalink"></a></h2><table><tr><th style="text-align: right">Pencil size</th><th style="text-align: right">Big-K (OOP)</th><th style="text-align: right">Reduced Sylvester (in-place)</th></tr><tr><td style="text-align: right">Small (n ≲ 15)</td><td style="text-align: right">Faster — LU is cheap, single multi-RHS solve.</td><td style="text-align: right">Setup overhead (two Schurs + one LU) dominates.</td></tr><tr><td style="text-align: right">Large (n ≳ 30)</td><td style="text-align: right">LU of <span>$(n n_x)^2$</span> becomes expensive.</td><td style="text-align: right">Wins; only <span>$n_y \times n_y$</span> Schur + per-tangent <code>sylvds!</code>.</td></tr></table><p>At the SW07PFEIFER pencil (<span>$n = 42$</span>, <span>$n_x = 20$</span>) the in-place reverse runs roughly five times faster than the OOP reverse. At the RBC pencil (<span>$n = 5$</span>) the OOP path wins by ~50%.</p><h2 id="SMatrix-Dispatch"><a class="docs-heading-anchor" href="#SMatrix-Dispatch">SMatrix Dispatch</a><a id="SMatrix-Dispatch-1"></a><a class="docs-heading-anchor-permalink" href="#SMatrix-Dispatch" title="Permalink"></a></h2><p><code>StaticArrays</code> support requires explicit <code>Val(n_x)</code> so the return type is statically sized:</p><pre><code class="language-julia hljs">using StaticArrays
+As = SMatrix{5, 5, Float64}(A);  Bs = SMatrix{5, 5, Float64}(B)
+r = klein_map(As, Bs, Val(2); threshold = 1.0e-6)
+@assert r.g_x isa SMatrix{3, 2, Float64}
+@assert r.h_x isa SMatrix{2, 2, Float64}</code></pre><p>Without the <code>Val</code>, an SMatrix input falls through to the heap dispatch and returns plain <code>Matrix</code> outputs — type-stable code-gen requires the BK split to be known at compile time, and a runtime BK count cannot satisfy that.</p><h2 id="Examples"><a class="docs-heading-anchor" href="#Examples">Examples</a><a id="Examples-1"></a><a class="docs-heading-anchor-permalink" href="#Examples" title="Permalink"></a></h2><p>All snippets below assemble the RBC pencil from a parameter vector and then call the policy map, so AD can flow from <code>p</code> through the assembly into <code>klein_map</code>:</p><pre><code class="language-julia hljs">include(joinpath(pkgdir(MatrixEquationsAD), &quot;test&quot;, &quot;example_matrices&quot;, &quot;rbc.jl&quot;))
+using .RBCExampleMatrices: rbc_first_order_assembly
+
+p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]
+A, B, n_x = rbc_first_order_assembly(p)
+n_y = size(A, 1) - n_x</code></pre><p>A gradient of a policy-summary functional with respect to the parameter vector uses ForwardDiff straight through:</p><pre><code class="language-julia hljs">using ForwardDiff
+function policy_loss(p)
+    A, B, _ = rbc_first_order_assembly(p)
+    r = klein_map(A, B; threshold = 1.0e-6)
+    return sum(r.g_x) + sum(r.h_x)
+end
+∇p = ForwardDiff.gradient(policy_loss, p)</code></pre><p>ForwardDiff Jacobian of the flattened policy against the flattened pencil:</p><pre><code class="language-julia hljs">using ForwardDiff
+using MatrixEquationsAD
+
+n = size(A, 1)
+function klein_vec(x)
+    A_x = reshape(x[1:(n*n)], n, n)
+    B_x = reshape(x[(n*n+1):end], n, n)
+    r = klein_map(A_x, B_x; threshold = 1.0e-6)
+    return [vec(r.g_x); vec(r.h_x)]
+end
+J = ForwardDiff.jacobian(klein_vec, [vec(A); vec(B)])
+# size(J) == (n_y*n_x + n_x*n_x, 2*n*n) == (10, 50) for the RBC pencil.</code></pre><p>Enzyme batched forward of width 4 on a scalar loss:</p><pre><code class="language-julia hljs">using Enzyme, Random
+
+rng = MersenneTwister(0)
+dA_lanes = ntuple(_ -&gt; randn(rng, n, n), Val(4))
+dB_lanes = ntuple(_ -&gt; randn(rng, n, n), Val(4))
+
+loss(A, B) = (r = klein_map(A, B); sum(r.g_x) + sum(r.h_x))
+
+(out,) = Enzyme.autodiff(
+    Forward, loss, BatchDuplicated,
+    BatchDuplicated(copy(A), dA_lanes),
+    BatchDuplicated(copy(B), dB_lanes),
+)
+# `out` is a NamedTuple of the four scalar JVPs, one per tangent direction.</code></pre><p>In-place reverse on a <code>klein_map!</code> call:</p><pre><code class="language-julia hljs">g_x = zeros(n_y, n_x);  h_x = zeros(n_x, n_x)
+A_bar = zero(A);  B_bar = zero(B)
+
+Enzyme.autodiff(
+    Reverse, (g, h, A, B) -&gt; (klein_map!(g, h, A, B); sum(g) + sum(h)),
+    Active,
+    Duplicated(g_x, zero(g_x)),
+    Duplicated(h_x, zero(h_x)),
+    Duplicated(copy(A), A_bar),
+    Duplicated(copy(B), B_bar),
+)</code></pre><p>The <code>klein_map!</code> rule uses the reduced-Sylvester path; the OOP <code>klein_map</code> loss above routes through the big-K rule instead.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../">« Home</a><a class="docs-footer-nextpage" href="../lyapd/">Discrete Lyapunov (Schur) »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Friday 22 May 2026 19:37">Friday 22 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
