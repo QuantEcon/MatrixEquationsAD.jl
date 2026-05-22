@@ -6,14 +6,14 @@ using Test
 
 include(joinpath(@__DIR__, "example_matrices", "rbc.jl"))
 include(joinpath(@__DIR__, "example_matrices", "sgu.jl"))
-include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
 
 @testset "klein_map ForwardDiff rules" begin
     @testset "RBC heap OOP" begin
-        A, B, _ = RBCExampleMatrices.dp_rbc_first_order_gschur()
-        F = KleinMapFixtures.KLEIN_RBC
+        (; A_schur, B_schur, g_x, h_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+        A = A_schur
+        B = B_schur
         n = size(A, 1)
-        n_g = length(F.g_x)
+        n_g = length(g_x)
         x = [vec(A); vec(B)]
         fdm = central_fdm(5, 1; max_range = 1.0e-4)
 
@@ -26,8 +26,8 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
 
         y = klein_oop_vec(x)
         J = ForwardDiff.jacobian(klein_oop_vec, x)
-        @test reshape(y[1:n_g], size(F.g_x)) ≈ F.g_x
-        @test reshape(y[(n_g + 1):end], size(F.h_x)) ≈ F.h_x
+        @test reshape(y[1:n_g], size(g_x)) ≈ g_x
+        @test reshape(y[(n_g + 1):end], size(h_x)) ≈ h_x
 
         for dx in (
                 0.01 .* sin.(1:length(x)),
@@ -38,11 +38,12 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
     end
 
     @testset "RBC static OOP" begin
-        A, B, _ = RBCExampleMatrices.dp_rbc_first_order_gschur()
-        F = KleinMapFixtures.KLEIN_RBC
+        (; A_schur, B_schur, g_x, h_x, n_x) =
+            RBCExampleMatrices.dp_rbc_first_order_inputs()
+        A = A_schur
+        B = B_schur
         n = size(A, 1)
-        n_g = length(F.g_x)
-        n_x = size(F.h_x, 1)
+        n_g = length(g_x)
         x = [vec(A); vec(B)]
         fdm = central_fdm(5, 1; max_range = 1.0e-4)
 
@@ -55,8 +56,8 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
 
         y = klein_static_vec(x)
         J = ForwardDiff.jacobian(klein_static_vec, x)
-        @test reshape(y[1:n_g], size(F.g_x)) ≈ F.g_x
-        @test reshape(y[(n_g + 1):end], size(F.h_x)) ≈ F.h_x
+        @test reshape(y[1:n_g], size(g_x)) ≈ g_x
+        @test reshape(y[(n_g + 1):end], size(h_x)) ≈ h_x
 
         for dx in (
                 0.01 .* sin.(3.0 .* collect(1:length(x))),
@@ -67,10 +68,11 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
     end
 
     @testset "SGU heap OOP" begin
-        A, B, _ = SGUExampleMatrices.dp_sgu_first_order_gschur()
-        F = KleinMapFixtures.KLEIN_SGU
+        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
+        A = A_schur
+        B = B_schur
         n = size(A, 1)
-        n_g = length(F.g_x)
+        n_g = length(g_x)
         x = [vec(A); vec(B)]
         fdm = central_fdm(5, 1; max_range = 1.0e-4)
 
@@ -83,8 +85,8 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
 
         y = klein_oop_vec(x)
         J = ForwardDiff.jacobian(klein_oop_vec, x)
-        @test reshape(y[1:n_g], size(F.g_x)) ≈ F.g_x
-        @test reshape(y[(n_g + 1):end], size(F.h_x)) ≈ F.h_x
+        @test reshape(y[1:n_g], size(g_x)) ≈ g_x
+        @test reshape(y[(n_g + 1):end], size(h_x)) ≈ h_x
 
         for dx in (
                 0.01 .* sin.(1:length(x)),
@@ -95,28 +97,29 @@ include(joinpath(@__DIR__, "klein_map_fixtures.jl"))
     end
 
     @testset "SGU heap in-place" begin
-        A, B, _ = SGUExampleMatrices.dp_sgu_first_order_gschur()
-        F = KleinMapFixtures.KLEIN_SGU
+        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
+        A = A_schur
+        B = B_schur
         n = size(A, 1)
-        n_g = length(F.g_x)
-        g_size = size(F.g_x)
-        h_size = size(F.h_x)
+        n_g = length(g_x)
+        g_size = size(g_x)
+        h_size = size(h_x)
         x = [vec(A); vec(B)]
         fdm = central_fdm(5, 1; max_range = 1.0e-4)
 
         function klein_inplace_vec(x)
             A_x = reshape(x[1:(n * n)], n, n)
             B_x = reshape(x[((n * n) + 1):end], n, n)
-            g_x = Matrix{eltype(x)}(undef, g_size)
-            h_x = Matrix{eltype(x)}(undef, h_size)
-            klein_map!(g_x, h_x, A_x, B_x; threshold = 1.0e-6)
-            return [vec(g_x); vec(h_x)]
+            g_x_ip = Matrix{eltype(x)}(undef, g_size)
+            h_x_ip = Matrix{eltype(x)}(undef, h_size)
+            klein_map!(g_x_ip, h_x_ip, A_x, B_x; threshold = 1.0e-6)
+            return [vec(g_x_ip); vec(h_x_ip)]
         end
 
         y = klein_inplace_vec(x)
         J = ForwardDiff.jacobian(klein_inplace_vec, x)
-        @test reshape(y[1:n_g], size(F.g_x)) ≈ F.g_x
-        @test reshape(y[(n_g + 1):end], size(F.h_x)) ≈ F.h_x
+        @test reshape(y[1:n_g], size(g_x)) ≈ g_x
+        @test reshape(y[(n_g + 1):end], size(h_x)) ≈ h_x
 
         for dx in (
                 0.01 .* sin.(3.0 .* collect(1:length(x))),

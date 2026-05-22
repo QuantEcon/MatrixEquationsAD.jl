@@ -32,7 +32,9 @@ function klein_map_inplace_weighted(A, B, Wg, Wh, n_x, n_y)::Float64
 end
 
 @testset "klein_map Enzyme rules" begin
-    A, B, n_x = RBCExampleMatrices.dp_rbc_first_order_gschur()
+    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+    A = A_schur
+    B = B_schur
     n_y = size(A, 1) - n_x
     rng = MersenneTwister(13579)
     Wg = 1.0e-5 .* randn(rng, n_y, n_x)

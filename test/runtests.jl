@@ -4,6 +4,7 @@ using Test
 
 include("symmetric_matrix_utils.jl")
 include("readme_examples.jl")
+include("test_lyapd.jl")
 include("test_lyapdkr.jl")
 include("test_enzyme_dlyap.jl")
 include("test_enzyme_lyapdkr.jl")
