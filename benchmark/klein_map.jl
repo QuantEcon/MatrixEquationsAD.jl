@@ -12,8 +12,8 @@ include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sgu.jl"
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "fvgq.jl"))
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sw07.jl"))
 
-function klein_small_problem(threshold, n_tangents)
-    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+function klein_problem_from(fo, threshold, n_tangents)
+    (; A_schur, B_schur, n_x) = fo
     A = A_schur
     B = B_schur
     n_y = size(A, 1) - n_x
@@ -24,41 +24,15 @@ function klein_small_problem(threshold, n_tangents)
     return (; A, B, n_x, threshold, A_tangents, B_tangents, Wg, Wh)
 end
 
-function klein_medium_problem(threshold, n_tangents)
-    (; A_schur, B_schur, n_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
-    A = A_schur
-    B = B_schur
-    n_y = size(A, 1) - n_x
-    A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
-    B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
-    Wg = randn(n_y, n_x)
-    Wh = randn(n_x, n_x)
-    return (; A, B, n_x, threshold, A_tangents, B_tangents, Wg, Wh)
-end
-
-function klein_fvgq_problem(threshold, n_tangents)
-    (; A_schur, B_schur, n_x) = FVGQExampleMatrices.dp_fvgq_first_order_inputs()
-    A = A_schur
-    B = B_schur
-    n_y = size(A, 1) - n_x
-    A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
-    B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
-    Wg = randn(n_y, n_x)
-    Wh = randn(n_x, n_x)
-    return (; A, B, n_x, threshold, A_tangents, B_tangents, Wg, Wh)
-end
-
-function klein_sw07pfeifer_problem(threshold, n_tangents)
-    (; A_schur, B_schur, n_x) = SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs()
-    A = A_schur
-    B = B_schur
-    n_y = size(A, 1) - n_x
-    A_tangents = ntuple(_ -> randn(size(A)...), n_tangents)
-    B_tangents = ntuple(_ -> randn(size(B)...), n_tangents)
-    Wg = randn(n_y, n_x)
-    Wh = randn(n_x, n_x)
-    return (; A, B, n_x, threshold, A_tangents, B_tangents, Wg, Wh)
-end
+klein_small_problem(threshold, n_tangents) =
+    klein_problem_from(RBCExampleMatrices.dp_rbc_first_order_inputs(), threshold, n_tangents)
+klein_medium_problem(threshold, n_tangents) =
+    klein_problem_from(SGUExampleMatrices.dp_sgu_first_order_inputs(), threshold, n_tangents)
+klein_fvgq_problem(threshold, n_tangents) =
+    klein_problem_from(FVGQExampleMatrices.dp_fvgq_first_order_inputs(), threshold, n_tangents)
+klein_sw07pfeifer_problem(threshold, n_tangents) = klein_problem_from(
+    SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs(), threshold, n_tangents,
+)
 
 function klein_static_small_problem(threshold, n_tangents)
     (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
@@ -283,24 +257,26 @@ function klein_map_oop_static_group(problem)
     return g
 end
 
+# Layout (see plan §3):
+#   OOP heap primal + AD: RBC, SGU. Big-K factorisation blows up past
+#       n ≈ 15, so the FVGQ / SW07PFEIFER pencils only have the in-place
+#       Sylvester-path entries.
+#   In-place heap primal + AD: all four pencils.
+#   OOP static (SMatrix): RBC only — the StaticArrays path stops paying
+#       at n > 15.
 KLEIN_SUITE = BenchmarkGroup()
-KLEIN_SUITE["oop_heap_small"] = klein_map_oop_heap_group(klein_small_problem(1.0e-6, Val(4)))
-KLEIN_SUITE["oop_heap_medium"] = klein_map_oop_heap_group(klein_medium_problem(1.0e-6, Val(4)))
-KLEIN_SUITE["oop_heap_fvgq"] = klein_map_oop_heap_group(klein_fvgq_problem(1.0e-6, Val(4)))
-KLEIN_SUITE["oop_heap_sw07pfeifer"] =
-    klein_map_oop_heap_group(klein_sw07pfeifer_problem(1.0e-6, Val(4)))
-KLEIN_SUITE["inplace_heap_small"] = klein_map_inplace_heap_group(
-    klein_small_problem(1.0e-6, Val(4)),
-)
-KLEIN_SUITE["inplace_heap_medium"] = klein_map_inplace_heap_group(
-    klein_medium_problem(1.0e-6, Val(4)),
-)
-KLEIN_SUITE["inplace_heap_fvgq"] = klein_map_inplace_heap_group(
-    klein_fvgq_problem(1.0e-6, Val(4)),
-)
-KLEIN_SUITE["inplace_heap_sw07pfeifer"] = klein_map_inplace_heap_group(
-    klein_sw07pfeifer_problem(1.0e-6, Val(4)),
-)
+KLEIN_SUITE["oop_heap_small"] =
+    klein_map_oop_heap_group(klein_small_problem(1.0e-6, Val(4)))
+KLEIN_SUITE["oop_heap_medium"] =
+    klein_map_oop_heap_group(klein_medium_problem(1.0e-6, Val(4)))
+KLEIN_SUITE["inplace_heap_small"] =
+    klein_map_inplace_heap_group(klein_small_problem(1.0e-6, Val(4)))
+KLEIN_SUITE["inplace_heap_medium"] =
+    klein_map_inplace_heap_group(klein_medium_problem(1.0e-6, Val(4)))
+KLEIN_SUITE["inplace_heap_fvgq"] =
+    klein_map_inplace_heap_group(klein_fvgq_problem(1.0e-6, Val(4)))
+KLEIN_SUITE["inplace_heap_sw07pfeifer"] =
+    klein_map_inplace_heap_group(klein_sw07pfeifer_problem(1.0e-6, Val(4)))
 KLEIN_SUITE["oop_static_small"] =
     klein_map_oop_static_group(klein_static_small_problem(1.0e-6, Val(4)))
 KLEIN_SUITE
