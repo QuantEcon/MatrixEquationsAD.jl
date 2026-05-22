@@ -151,28 +151,43 @@ julia> using LinearAlgebra: eigvals
 julia> using MatrixEquationsAD
 
 julia> function rbc_first_order_assembly(p)
-           α, β, _ρ, δ, _σ, _Ω_1 = p     # σ, Ω_1 don't enter the pencil
-           rk = (1 / β - 1 + δ) / α       # ≡ k_ss^(α-1) from the Euler SS
+           α, β, ρ, δ, _σ, _Ω_1 = p          # σ, Ω_1 enter only the shock loading
+           # Deterministic SS from the Euler condition
+           #   α · k_ss^(α-1) = 1/β - 1 + δ.
+           rk   = (1 / β - 1 + δ) / α        # ≡ k_ss^(α-1)
            k_ss = rk^(1 / (α - 1))
-           y_ss = k_ss^α
-           c_ss = y_ss - δ * k_ss
+           y_ss = k_ss^α                     # production at SS
+           c_ss = y_ss - δ * k_ss            # consumption  c_ss = y_ss - δ·k_ss
+           mpk  = α * k_ss^(α - 1)           # marginal product of capital at SS
+           # Variable ordering of z_t:
+           k_col, z_col, c_col, y_col, i_col = 1, 2, 3, 4, 5
            T = promote_type(typeof(α), typeof(β), typeof(δ), typeof(k_ss))
            A = zeros(T, 5, 5)
            B = zeros(T, 5, 5)
-           # Row 1 — Euler
-           A[1, 1] = -β * α * (α - 1) * k_ss^(α - 2) / c_ss
-           A[1, 2] = -β * α * k_ss^(α - 1) / c_ss
-           A[1, 3] = inv(c_ss^2)
-           B[1, 3] = -inv(c_ss^2)
-           # Row 2 — capital budget
-           A[2, 1] = one(T); B[2, 1] = -(one(T) - δ); B[2, 3] = one(T); B[2, 4] = -one(T)
-           # Row 3 — production
-           B[3, 1] = -α * k_ss^(α - 1); B[3, 2] = -y_ss; B[3, 4] = one(T)
-           # Row 4 — TFP AR(1)
-           A[4, 2] = one(T); B[4, 2] = -p[3]
-           # Row 5 — investment identity
-           A[5, 1] = -one(T); B[5, 1] = one(T) - δ; B[5, 5] = one(T)
-           return A, B, 2
+           # Row 1 — Euler equation
+           #   1/c_t = β · E_t[(1/c_{t+1}) · (α·e^{z_{t+1}}·k_{t+1}^(α-1) + 1 - δ)].
+           # Linearise; β·(mpk + 1 - δ) = 1 at SS collapses the c_{t+1} coefficient to 1/c_ss².
+           A[1, k_col] = -β * (α - 1) * mpk / k_ss / c_ss     # ∂/∂k_{t+1}
+           A[1, z_col] = -β * mpk / c_ss                       # ∂/∂z_{t+1}
+           A[1, c_col] = inv(c_ss^2)                            # ∂/∂c_{t+1}
+           B[1, c_col] = -inv(c_ss^2)                           # ∂/∂c_t
+           # Row 2 — capital budget,  k_{t+1} = (1-δ)·k_t + y_t - c_t.
+           A[2, k_col] = one(T)
+           B[2, k_col] = -(one(T) - δ)
+           B[2, c_col] = one(T)
+           B[2, y_col] = -one(T)
+           # Row 3 — production (linearised),  y_t = mpk·k_t + y_ss·z_t.
+           B[3, k_col] = -mpk
+           B[3, z_col] = -y_ss
+           B[3, y_col] = one(T)
+           # Row 4 — TFP AR(1),  z_{t+1} = ρ·z_t.
+           A[4, z_col] = one(T)
+           B[4, z_col] = -ρ
+           # Row 5 — investment identity,  i_t = k_{t+1} - (1-δ)·k_t.
+           A[5, k_col] = -one(T)
+           B[5, k_col] = one(T) - δ
+           B[5, i_col] = one(T)
+           return A, B, 2                       # n_x = 2 predetermined states (k, z)
        end;
 
 julia> p = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01];

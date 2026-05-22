@@ -266,3 +266,110 @@ autodiff(
 )
 # A_bar, C_bar now hold the gradients.
 ```
+
+## Example: differentiating stationary variance through the pipeline
+
+Composing parameter assembly → `klein_map` → `lyapd` gives a scalar
+function ``\tilde V_{kk}(p)`` that returns the stationary variance of
+capital under the linearised RBC model. Every AD backend supported by
+the package differentiates it end-to-end. The function below uses the
+same `rbc_first_order_assembly(p)` as the
+[Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy)
+(reproduced here for self-containment) and pipes its output through
+`klein_map`, then solves the discrete Lyapunov equation
+``V = h_x V h_x^\top + Q`` with shock loading
+``B_{\text{shock}} = [0;\, \sigma]`` and innovation covariance
+``Q = B_{\text{shock}}\,B_{\text{shock}}^\top``:
+
+```@example lyapd_pipeline
+ENV["GKSwstype"] = "100"   # GR headless backend for CI
+
+using ForwardDiff
+using MatrixEquations: lyapd
+using MatrixEquationsAD
+
+function rbc_first_order_assembly(p)
+    α, β, ρ, δ, _σ, _Ω_1 = p
+    rk   = (1 / β - 1 + δ) / α
+    k_ss = rk^(1 / (α - 1))
+    y_ss = k_ss^α
+    c_ss = y_ss - δ * k_ss
+    mpk  = α * k_ss^(α - 1)
+    k_col, z_col, c_col, y_col, i_col = 1, 2, 3, 4, 5
+    T = promote_type(typeof(α), typeof(β), typeof(δ), typeof(k_ss))
+    A = zeros(T, 5, 5); B = zeros(T, 5, 5)
+    A[1, k_col] = -β * (α - 1) * mpk / k_ss / c_ss
+    A[1, z_col] = -β * mpk / c_ss
+    A[1, c_col] = inv(c_ss^2)
+    B[1, c_col] = -inv(c_ss^2)
+    A[2, k_col] = one(T); B[2, k_col] = -(one(T) - δ)
+    B[2, c_col] = one(T); B[2, y_col] = -one(T)
+    B[3, k_col] = -mpk;   B[3, z_col] = -y_ss; B[3, y_col] = one(T)
+    A[4, z_col] = one(T); B[4, z_col] = -ρ
+    A[5, k_col] = -one(T); B[5, k_col] = one(T) - δ; B[5, i_col] = one(T)
+    return A, B, 2
+end
+
+function stationary_capital_variance(p)
+    A, B, _ = rbc_first_order_assembly(p)
+    r = klein_map(A, B; threshold = 1.0e-6)
+    σ = p[5]
+    Q = [0.0 0.0; 0.0 σ^2]
+    V = lyapd(r.h_x, Q)
+    return V[1, 1]
+end
+
+p₀ = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]
+V_kk  = stationary_capital_variance(p₀)
+∇V_kk = ForwardDiff.gradient(stationary_capital_variance, p₀)
+```
+
+`∇V_kk[6]` is exactly zero because ``\Omega_1`` is the measurement-noise
+standard deviation and never enters the dynamics. `∇V_kk[5] > 0` says
+larger TFP innovations raise the stationary variance of capital;
+`∇V_kk[3] > 0` says higher TFP persistence raises it through the
+cumulative-shock channel ``h_x[1,2]``.
+
+To visualise the gradient, sweep each parameter ±5% around the baseline
+and overlay the linear tangent
+``V_{kk}(p_0) + \partial V_{kk}/\partial p_i\,(p_i - p_{0,i})``:
+
+```@example lyapd_pipeline
+using Plots
+
+labels = ["α", "β", "ρ", "δ", "σ", "Ω_1"]
+panels = map(1:6) do i
+    p_range = range(0.95 * p₀[i], 1.05 * p₀[i], length = 25)
+    V_curve = map(p_range) do p_i
+        q = copy(p₀); q[i] = p_i
+        stationary_capital_variance(q)
+    end
+    tangent = V_kk .+ ∇V_kk[i] .* (p_range .- p₀[i])
+    plt = plot(p_range, V_curve;
+        label = "V_kk", xlabel = labels[i], ylabel = "V_kk",
+        legend = :outerbottom)
+    plot!(plt, p_range, tangent; label = "tangent", linestyle = :dash)
+    plt
+end
+plot(panels...; layout = (2, 3), size = (900, 540))
+```
+
+The dashed tangent line in each panel is exactly
+``\partial V_{kk}/\partial p_i`` from ForwardDiff. The two near-flat
+panels (`σ` and `Ω_1`) are special: `Ω_1` is constant zero (it doesn't
+enter), and `σ` enters only through ``Q = \sigma^2`` so the curve is
+quadratic and the tangent at the baseline is shallow.
+
+Switching backends is a one-line change. With
+[`DifferentiationInterface.jl`](https://github.com/JuliaDiff/DifferentiationInterface.jl):
+
+```julia
+using DifferentiationInterface: AutoEnzyme, gradient
+using Enzyme
+
+∇V_kk_enzyme = gradient(stationary_capital_variance,
+                        AutoEnzyme(mode = Enzyme.Reverse), p₀)
+```
+
+returns the same gradient to floating-point round-off.
+
