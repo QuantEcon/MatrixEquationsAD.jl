@@ -37,13 +37,13 @@ function lyapd_problem_from(fo, n_tangents)
 end
 
 lyapd_small_problem(n_tangents) =
-    lyapd_problem_from(RBCExampleMatrices.dp_rbc_first_order_inputs(), n_tangents)
+    lyapd_problem_from(RBCExampleMatrices.rbc_first_order_inputs(), n_tangents)
 lyapd_medium_problem(n_tangents) =
-    lyapd_problem_from(SGUExampleMatrices.dp_sgu_first_order_inputs(), n_tangents)
+    lyapd_problem_from(SGUExampleMatrices.sgu_first_order_inputs(), n_tangents)
 lyapd_fvgq_problem(n_tangents) =
-    lyapd_problem_from(FVGQExampleMatrices.dp_fvgq_first_order_inputs(), n_tangents)
+    lyapd_problem_from(FVGQExampleMatrices.fvgq_first_order_inputs(), n_tangents)
 lyapd_sw07pfeifer_problem(n_tangents) =
-    lyapd_problem_from(SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs(), n_tangents)
+    lyapd_problem_from(SW07ExampleMatrices.sw07pfeifer_first_order_inputs(), n_tangents)
 
 lyapd_loss(A, C, W) = dot(W, lyapd(A, C))
 

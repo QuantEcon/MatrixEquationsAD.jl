@@ -1,16 +1,15 @@
 module SW07ExampleMatrices
 
-export dp_sw07pfeifer_first_order_inputs
+export sw07pfeifer_first_order_inputs
 
-# Smets-Wouters 2007 / Pfeifer-style first-order assembly + klein solution
-# bundle captured from DifferentiablePerturbation.jl. Returns
-# (; A_schur, B_schur, B_shock, g_x, h_x, n_x) so klein_map / lyapd tests
-# can share a single fixture.
+# Smets-Wouters 2007 / Pfeifer-style first-order assembly + klein
+# solution bundle. Returns (; A_schur, B_schur, B_shock, g_x, h_x, n_x)
+# so klein_map / lyapd tests can share a single fixture.
 
 # FO assembly + klein solution bundle for downstream matrix-equation tests.
 # klein_map:  (A_schur, B_schur) → (g_x, h_x).
 # lyapd:      lyapd(h_x, B_shock * transpose(B_shock)).
-function dp_sw07pfeifer_first_order_inputs()
+function sw07pfeifer_first_order_inputs()
     A_schur = [
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;

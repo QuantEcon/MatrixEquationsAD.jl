@@ -25,17 +25,17 @@ function klein_problem_from(fo, threshold, n_tangents)
 end
 
 klein_small_problem(threshold, n_tangents) =
-    klein_problem_from(RBCExampleMatrices.dp_rbc_first_order_inputs(), threshold, n_tangents)
+    klein_problem_from(RBCExampleMatrices.rbc_first_order_inputs(), threshold, n_tangents)
 klein_medium_problem(threshold, n_tangents) =
-    klein_problem_from(SGUExampleMatrices.dp_sgu_first_order_inputs(), threshold, n_tangents)
+    klein_problem_from(SGUExampleMatrices.sgu_first_order_inputs(), threshold, n_tangents)
 klein_fvgq_problem(threshold, n_tangents) =
-    klein_problem_from(FVGQExampleMatrices.dp_fvgq_first_order_inputs(), threshold, n_tangents)
+    klein_problem_from(FVGQExampleMatrices.fvgq_first_order_inputs(), threshold, n_tangents)
 klein_sw07pfeifer_problem(threshold, n_tangents) = klein_problem_from(
-    SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs(), threshold, n_tangents,
+    SW07ExampleMatrices.sw07pfeifer_first_order_inputs(), threshold, n_tangents,
 )
 
 function klein_static_small_problem(threshold, n_tangents)
-    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+    (; A_schur, B_schur, n_x) = RBCExampleMatrices.rbc_first_order_inputs()
     A = A_schur
     B = B_schur
     n = size(A, 1)

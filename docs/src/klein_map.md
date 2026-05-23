@@ -98,9 +98,7 @@ A\,\Psi\,h_x \;+\; B\,\Psi
    W \;=\; Z_{bb}^\top \;+\; Z_{lb}^\top\,g_x.
    ```
 
-The construction is a direct port of
-[`DifferentiablePerturbation.jl`](https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl)'s
-`first_order_perturbation!`; see `src/klein_map.jl` for the indexing.
+See `src/klein_map.jl` for the indexing.
 
 ## Post-conditions
 
@@ -132,13 +130,11 @@ p = [\alpha,\ \beta,\ \rho,\ \delta,\ \sigma,\ \Omega_1]
 ```
 
 (capital share, discount factor, TFP persistence, depreciation, TFP
-innovation s.d., observation-noise s.d.). The function below is a
-readable port of
-[`DifferentiablePerturbation.jl`'s code-generated
-`RBC.first_order_assembly!`](https://github.com/HighDimensionalEconLab/DifferentiablePerturbation.jl/blob/main/src/models/RBC_generated/first_order_ip.jl)
-with each matrix entry in natural model variables. It is pure Julia, so
-ForwardDiff `Dual` and Enzyme `Duplicated` perturbations of `p` flow
-through it into `klein_map`.
+innovation s.d., observation-noise s.d.). The function below assembles
+the pencil ``(A, B)`` symbolically from the steady-state conditions,
+with each matrix entry in natural model variables. It is pure Julia,
+so ForwardDiff `Dual` and Enzyme `Duplicated` perturbations of `p`
+flow through it into `klein_map`.
 
 The five rows of the linearisation are: 1. Euler equation, 2. capital
 budget, 3. production, 4. TFP AR(1), 5. investment identity. The

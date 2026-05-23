@@ -41,11 +41,11 @@ end
 
 @testset "lyapd / lyapd! primal — DSGE fixtures" begin
     fixtures = (
-        ("rbc", RBCExampleMatrices.dp_rbc_first_order_inputs()),
-        ("rbc_sv", RBCExampleMatrices.dp_rbc_sv_first_order_inputs()),
-        ("sgu", SGUExampleMatrices.dp_sgu_first_order_inputs()),
-        ("fvgq", FVGQExampleMatrices.dp_fvgq_first_order_inputs()),
-        ("sw07pfeifer", SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs()),
+        ("rbc", RBCExampleMatrices.rbc_first_order_inputs()),
+        ("rbc_sv", RBCExampleMatrices.rbc_sv_first_order_inputs()),
+        ("sgu", SGUExampleMatrices.sgu_first_order_inputs()),
+        ("fvgq", FVGQExampleMatrices.fvgq_first_order_inputs()),
+        ("sw07pfeifer", SW07ExampleMatrices.sw07pfeifer_first_order_inputs()),
     )
     for (name, fo) in fixtures
         (; h_x, B_shock, n_x) = fo
@@ -185,9 +185,9 @@ end
         "sgu" => 1003,
     )
     fixtures = (
-        ("rbc", RBCExampleMatrices.dp_rbc_first_order_inputs()),
-        ("rbc_sv", RBCExampleMatrices.dp_rbc_sv_first_order_inputs()),
-        ("sgu", SGUExampleMatrices.dp_sgu_first_order_inputs()),
+        ("rbc", RBCExampleMatrices.rbc_first_order_inputs()),
+        ("rbc_sv", RBCExampleMatrices.rbc_sv_first_order_inputs()),
+        ("sgu", SGUExampleMatrices.sgu_first_order_inputs()),
     )
     for (name, fo) in fixtures
         (; h_x, B_shock, n_x) = fo

@@ -1,7 +1,6 @@
-# Klein (2000) / Sims policy-function extraction. Direct port of
-# DifferentiablePerturbation's first_order_perturbation!
-# (DP src/first_order_perturbation.jl:102-180), with the LAPACK calls
-# replaced by stock LinearAlgebra equivalents.
+# Klein (2000) / Sims policy-function extraction from an ordered
+# generalised Schur decomposition of (A, B), using stock LinearAlgebra
+# routines.
 #
 # Public API:
 #   klein_map(A, B; threshold)          → (; g_x, h_x)

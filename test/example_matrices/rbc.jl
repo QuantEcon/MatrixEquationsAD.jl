@@ -1,29 +1,27 @@
 module RBCExampleMatrices
 
-export dp_rbc_first_order_inputs, dp_rbc_sv_first_order_inputs,
+export rbc_first_order_inputs, rbc_sv_first_order_inputs,
     rbc_first_order_assembly
 
-# RBC / RBC_SV first-order assembly + klein solution bundles captured from
-# DifferentiablePerturbation.jl canonical parameter vectors. Each function
-# returns (; A_schur, B_schur, B_shock, g_x, h_x, n_x) so downstream tests can
+# RBC / RBC_SV first-order assembly + klein solution bundles for the
+# canonical parameter vectors below. Each function returns
+# (; A_schur, B_schur, B_shock, g_x, h_x, n_x) so downstream tests can
 # pair klein_map (A_schur, B_schur → g_x, h_x) with lyapd (h_x, B_shock).
 #
-# RBC_P    = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]                 (DP test/first_order_perturbation.jl:7)
-# RBC_SV_P = vcat(RBC_P, [0.9, -4.0, 0.1])                       (DP test/first_order_perturbation.jl:8)
+# RBC_P    = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]
+# RBC_SV_P = vcat(RBC_P, [0.9, -4.0, 0.1])
 #
-# `rbc_first_order_assembly(p)` is a hand-written port of
-# `DifferentiablePerturbation.jl`'s code-generated
-# `RBC.first_order_assembly!` (src/models/RBC_generated/first_order_ip.jl)
-# with the CSE-named locals replaced by their model meaning. It is purely
-# functional and ForwardDiff-/Enzyme-compatible, so it provides a
-# parameter-to-pencil entry point that AD can pass through into
-# `klein_map`. The hard-coded `dp_rbc_first_order_inputs` returns the same
-# matrices at `RBC_P` to bit-for-bit precision.
+# `rbc_first_order_assembly(p)` derives the RBC pencil symbolically from
+# the steady-state conditions. It is purely functional and
+# ForwardDiff-/Enzyme-compatible, so it provides a parameter-to-pencil
+# entry point that AD can pass through into `klein_map`. The hard-coded
+# `rbc_first_order_inputs` returns the same matrices at `RBC_P` to
+# bit-for-bit precision.
 
 # FO assembly + klein solution bundle for downstream matrix-equation tests.
 # klein_map:  (A_schur, B_schur) → (g_x, h_x).
 # lyapd:      lyapd(h_x, B_shock * transpose(B_shock)).
-function dp_rbc_first_order_inputs()
+function rbc_first_order_inputs()
     A_schur = [
         0.00012263591151906127 -0.011623494029190608 0.028377570562199094 0.0 0.0;
         1.0 0.0 0.0 0.0 0.0;
@@ -73,10 +71,6 @@ investment). The five rows of the pencil are, in order:
 of which is part of the pencil, so they do not show up below. The function
 is pure Julia; ForwardDiff `Dual` and Enzyme `Duplicated` perturbations of
 `p` flow through to `(A, B)`.
-
-Translated from `DifferentiablePerturbation.jl`'s code-generated
-`RBC.first_order_assembly!` (`src/models/RBC_generated/first_order_ip.jl`)
-by undoing common-subexpression elimination and naming the locals.
 """
 function rbc_first_order_assembly(p)
     α, β, _ρ, δ, _σ, _Ω_1 = p  # σ, Ω_1 unused in the pencil
@@ -128,7 +122,7 @@ end
 # FO assembly + klein solution bundle for downstream matrix-equation tests.
 # klein_map:  (A_schur, B_schur) → (g_x, h_x).
 # lyapd:      lyapd(h_x, B_shock * transpose(B_shock)).
-function dp_rbc_sv_first_order_inputs()
+function rbc_sv_first_order_inputs()
     A_schur = [
         0.00012263591151906127 0.0 0.0 0.0 0.028377570562199094 0.0 -0.011623494029190608 0.0;
         1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;

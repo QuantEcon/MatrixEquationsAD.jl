@@ -1,17 +1,17 @@
 module FVGQExampleMatrices
 
-export dp_fvgq_first_order_inputs
+export fvgq_first_order_inputs
 
-# 38x38 FVGQ-style first-order assembly + klein solution bundle captured from
-# DifferentiablePerturbation.jl (FVGQ20 pseudo-truth, mirroring the pencil
-# originally posted at https://github.com/QuantEcon/MatrixEquationsAD.jl/issues/2).
-# Returns (; A_schur, B_schur, B_shock, g_x, h_x, n_x) so klein_map / lyapd
+# 38x38 Fernández-Villaverde / Guerrón-Quintana-style first-order
+# assembly + klein solution bundle. The pencil mirrors the one posted at
+# https://github.com/QuantEcon/MatrixEquationsAD.jl/issues/2. Returns
+# (; A_schur, B_schur, B_shock, g_x, h_x, n_x) so klein_map / lyapd
 # tests can share a single fixture.
 
 # FO assembly + klein solution bundle for downstream matrix-equation tests.
 # klein_map:  (A_schur, B_schur) → (g_x, h_x).
 # lyapd:      lyapd(h_x, B_shock * transpose(B_shock)).
-function dp_fvgq_first_order_inputs()
+function fvgq_first_order_inputs()
     A_schur = [
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 -34.4508416669585 0.0 0.0 0.0 0.0 0.0 1231.4851620988343 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 999.7920052275936 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;

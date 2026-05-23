@@ -1,12 +1,13 @@
 module SGUExampleMatrices
 
-export dp_sgu_first_order_inputs, sgu_B_shock, sgu_h_x
+export sgu_first_order_inputs, sgu_B_shock, sgu_h_x
 
-# SGU first-order assembly + klein solution bundle captured from
-# DifferentiablePerturbation.jl examples; `sgu_h_x` and `sgu_B_shock` are
-# legacy standalone fixtures consumed by benchmark/lyapd.jl and benchmark/ared.jl
-# (kept here for those benchmarks; the unified bundle below supersedes them
-# for klein_map / matrix-equation tests).
+# Schmitt-Grohé & Uribe small open-economy first-order assembly + klein
+# solution bundle for the parameter vector below. `sgu_h_x` and
+# `sgu_B_shock` are legacy standalone fixtures consumed by
+# benchmark/lyapd.jl and benchmark/ared.jl (kept here for those
+# benchmarks; the unified bundle below supersedes them for klein_map /
+# matrix-equation tests).
 #
 # SGU_P = [2.0, 1.455, 0.42, 0.0129, 0.1, 0.000742, 0.32, 0.028,
 #          1/(1+0.04), 0.04, 0.7442, 0.2, 0.003, 0.4, 0.01, 0.01]
@@ -38,7 +39,7 @@ end
 # FO assembly + klein solution bundle for downstream matrix-equation tests.
 # klein_map:  (A_schur, B_schur) → (g_x, h_x).
 # lyapd:      lyapd(h_x, B_shock * transpose(B_shock)).
-function dp_sgu_first_order_inputs()
+function sgu_first_order_inputs()
     A_schur = [
         1.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;
         0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0 0.0;

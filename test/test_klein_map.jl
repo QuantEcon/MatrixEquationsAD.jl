@@ -31,11 +31,11 @@ include(joinpath(@__DIR__, "example_matrices", "sw07.jl"))
 
 @testset "klein_map" begin
     fixtures = (
-        ("rbc", RBCExampleMatrices.dp_rbc_first_order_inputs()),
-        ("rbc_sv", RBCExampleMatrices.dp_rbc_sv_first_order_inputs()),
-        ("sgu", SGUExampleMatrices.dp_sgu_first_order_inputs()),
-        ("fvgq", FVGQExampleMatrices.dp_fvgq_first_order_inputs()),
-        ("sw07pfeifer", SW07ExampleMatrices.dp_sw07pfeifer_first_order_inputs()),
+        ("rbc", RBCExampleMatrices.rbc_first_order_inputs()),
+        ("rbc_sv", RBCExampleMatrices.rbc_sv_first_order_inputs()),
+        ("sgu", SGUExampleMatrices.sgu_first_order_inputs()),
+        ("fvgq", FVGQExampleMatrices.fvgq_first_order_inputs()),
+        ("sw07pfeifer", SW07ExampleMatrices.sw07pfeifer_first_order_inputs()),
     )
     for (name, fo) in fixtures
         (; A_schur, B_schur, g_x, h_x, n_x) = fo
@@ -108,7 +108,7 @@ end
 
 @testset "klein_map ForwardDiff rules" begin
     @testset "RBC heap OOP" begin
-        (; A_schur, B_schur, g_x, h_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+        (; A_schur, B_schur, g_x, h_x) = RBCExampleMatrices.rbc_first_order_inputs()
         A = A_schur
         B = B_schur
         n = size(A, 1)
@@ -138,7 +138,7 @@ end
 
     @testset "RBC static OOP" begin
         (; A_schur, B_schur, g_x, h_x, n_x) =
-            RBCExampleMatrices.dp_rbc_first_order_inputs()
+            RBCExampleMatrices.rbc_first_order_inputs()
         A = A_schur
         B = B_schur
         n = size(A, 1)
@@ -167,7 +167,7 @@ end
     end
 
     @testset "SGU heap OOP" begin
-        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
+        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.sgu_first_order_inputs()
         A = A_schur
         B = B_schur
         n = size(A, 1)
@@ -196,7 +196,7 @@ end
     end
 
     @testset "SGU heap in-place" begin
-        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.dp_sgu_first_order_inputs()
+        (; A_schur, B_schur, g_x, h_x) = SGUExampleMatrices.sgu_first_order_inputs()
         A = A_schur
         B = B_schur
         n = size(A, 1)
@@ -230,7 +230,7 @@ end
 end
 
 @testset "klein_map Enzyme rules" begin
-    (; A_schur, B_schur, n_x) = RBCExampleMatrices.dp_rbc_first_order_inputs()
+    (; A_schur, B_schur, n_x) = RBCExampleMatrices.rbc_first_order_inputs()
     A = A_schur
     B = B_schur
     n_y = size(A, 1) - n_x
