@@ -265,14 +265,54 @@ y_t \;=\; \mu_t \;+\; \varepsilon_t \;+\; v_t,
 v_t \sim \mathcal{N}(0, \sigma_v^2).
 ```
 
-Stacked, ``G = \begin{bmatrix}1 & 1\end{bmatrix}`` is ``1 \times 2`` — the
-mapping from state to observation is not invertible. The filter
-nonetheless identifies both components in the limit because the two
-state coordinates have *different dynamics*: permanent shocks live
-forever while transitory shocks decay at rate ``\rho``. The Kalman gain
-``K \in \mathbb{R}^{2 \times 1}`` encodes how a unit observation
-surprise is split between updating ``\hat\mu`` and updating
-``\hat\varepsilon``.
+Stacked into the standard linear-Gaussian state-space form
+
+```math
+x_{t+1} \;=\; A\,x_t \;+\; C\,w_{t+1},
+\qquad
+y_t \;=\; G\,x_t \;+\; v_t,
+\qquad
+w_t \sim \mathcal{N}(0, I_2),
+\quad
+v_t \sim \mathcal{N}(0, R),
+```
+
+with state ``x_t = \begin{bmatrix}\mu_t \\ \varepsilon_t\end{bmatrix}``,
+the four matrices are
+
+```math
+A \;=\;
+\begin{bmatrix}
+1 & 0 \\
+0 & \rho
+\end{bmatrix},
+\qquad
+C \;=\;
+\begin{bmatrix}
+\sigma_\nu & 0 \\
+0 & \sigma_\omega
+\end{bmatrix},
+\qquad
+G \;=\;
+\begin{bmatrix}
+1 & 1
+\end{bmatrix},
+\qquad
+R \;=\;
+\bigl[\sigma_v^2\bigr],
+```
+
+so the process-noise covariance is
+``C\,C^\top = \operatorname{diag}(\sigma_\nu^2,\,\sigma_\omega^2)``.
+``G`` is ``1 \times 2`` and **not invertible** — its null space is
+spanned by ``[1, -1]^\top``, which is exactly the cross-sectional
+indeterminacy between the level of ``\mu`` and the level of
+``\varepsilon`` at a single date. The filter nonetheless identifies
+both components in the limit because the two state coordinates have
+*different dynamics*: permanent shocks live forever while transitory
+shocks decay at rate ``\rho``. The Kalman gain ``K \in \mathbb{R}^{2 \times 1}``
+encodes how a unit observation surprise is split between updating
+``\hat\mu`` and updating ``\hat\varepsilon``.
 
 ```@example muth
 ENV["GKSwstype"] = "100"   # GR headless backend for CI
