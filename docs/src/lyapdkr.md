@@ -6,12 +6,18 @@
 A X A^\top - X + C = 0
 ```
 
-via the Kronecker-vectorised form. Unlike `MatrixEquations.lyapd`,
-which uses a Schur-based Bartels–Stewart solver, `lyapdkr`
-LU-factorises the full ``(n^2) \times (n^2)`` Kronecker operator once
-and reuses that factorisation across all tangent / cotangent
-directions. The output is symmetrised, so nonsymmetric perturbations of
-``C`` are projected onto the symmetric solution manifold.
+via the Kronecker-vectorised form. Where `MatrixEquations.lyapd` uses a
+Schur-based Bartels–Stewart solver, `lyapdkr` LU-factorises the full
+``(n^2) \times (n^2)`` Kronecker operator once and reuses that
+factorisation across all tangent / cotangent directions. The output is
+symmetrised, so nonsymmetric perturbations of ``C`` are projected onto
+the symmetric solution manifold.
+
+The same equation governs the stationary covariance of the QuantEcon
+[Linear State Space Model](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+``x_{t+1} = A\,x_t + w_{t+1}`` with ``w_t \sim \mathcal{N}(0, Q)``;
+this page uses the Kronecker LU instead of the Schur sweep on the
+[Discrete Lyapunov (Schur)](lyapd.md) page.
 
 Implementation pointers:
 
@@ -23,7 +29,7 @@ Implementation pointers:
 
 With column-major `vec` and the identity
 ``\operatorname{vec}(A X A^\top) = (A \otimes A)\operatorname{vec}(X)``,
-the discrete Lyapunov equation becomes
+the equation becomes
 
 ```math
 \bigl(I_{n^2} - A \otimes A\bigr)\,\operatorname{vec}(X)
@@ -31,19 +37,18 @@ the discrete Lyapunov equation becomes
 \operatorname{vec}(C).
 ```
 
-`lyapdkrfactor` builds ``M = I - A \otimes A`` and stores its LU
-factorisation in a `LyapDKrLUCache`. Let
-``P(N) = \tfrac{1}{2}(N + N^\top)`` denote the symmetric projection.
-`lyapdkrsolve` performs one back-substitution against ``M`` and
-projects:
+`lyapdkrfactor` builds ``M = I - A \otimes A`` and stores its LU in a
+`LyapDKrLUCache`. With ``P(N) = \tfrac{1}{2}(N + N^\top)`` the
+symmetric projection, `lyapdkrsolve` performs one back-substitution
+and projects:
 
 ```math
 X \;=\; P\!\left(\operatorname{reshape}(M^{-1}\operatorname{vec}(C),\; n,\; n)\right).
 ```
 
-The factorisation assumptions are:
+Assumptions:
 
-- ``M`` is nonsingular — equivalently, no pair of eigenvalues of ``A``
+- ``M`` nonsingular — equivalently, no pair of eigenvalues of ``A``
   has product equal to one. ``\rho(A) < 1`` is sufficient.
 - Optional diagnostics: `tol_diag` bounds ``|X_{ii}|`` and `check_psd`
   rejects negative diagonals.
@@ -78,12 +83,13 @@ true
 ```
 
 `lyapdkr` and `lyapd` return the same solution up to round-off, but
-take very different paths: `lyapd` uses an ``O(n^3)`` Schur sweep,
-`lyapdkr` LU-factorises an ``n^2 \times n^2`` Kronecker matrix.
+take different paths: `lyapd` runs an ``O(n^3)`` Schur sweep, `lyapdkr`
+LU-factorises an ``n^2 \times n^2`` Kronecker matrix.
 
 ## ForwardDiff JVP
 
-For one tangent direction ``(d A, d C)``, differentiating
+**Step 1: differentiate the implicit equation.** For one tangent
+direction ``(d A, d C)``, differentiating
 ``M\,\operatorname{vec}(X) = \operatorname{vec}(C)`` gives
 
 ```math
@@ -96,20 +102,25 @@ d C \;+\; d A\,X\,A^\top \;+\; A\,X\,d A^\top
 d X \;=\; P(d X_{\mathrm{raw}}).
 ```
 
-The ForwardDiff overload runs `lyapdkrfactor` once on the value layer
-and calls `lyapdkrsolve(cache, RHS_i)` once per partial direction
-inside the chunk. A chunk of width ``N`` performs ``N`` LU
-back-substitutions against the shared factorisation.
+**Step 2: cached factorisation.** The LU of
+``M = I_{n^2} - A \otimes A`` is built once on the value layer and
+reused for every tangent.
 
-The Enzyme `BatchDuplicated` forward rule is structurally identical:
-one factorise, ``N`` solves.
+**Step 3: solve per direction.** One LU back-substitution against the
+shared factorisation, followed by symmetric projection.
+
+**Step 4: code path.** The ForwardDiff overload runs `lyapdkrfactor`
+once on the value layer and calls `lyapdkrsolve(cache, RHS_i)` once
+per partial direction. A chunk of width ``N`` issues ``N``
+back-substitutions; the Enzyme `BatchDuplicated` forward rule is
+structurally identical.
 
 ## Enzyme VJP
 
-Let ``\bar X`` be the cotangent on the output. Symmetrise first to
-project onto the symmetric manifold,
-``S = P(\bar X) = \tfrac{1}{2}(\bar X + \bar X^\top)``, then perform
-one transposed solve
+**Step 1: differentiate the implicit equation (adjoint).** Let
+``\bar X`` be the cotangent on the output. Symmetrise
+``S = P(\bar X) = \tfrac{1}{2}(\bar X + \bar X^\top)`` and solve the
+transposed system
 
 ```math
 \operatorname{vec}(Y) \;=\; M^{-\top}\,\operatorname{vec}(S),
@@ -117,22 +128,23 @@ one transposed solve
 M = I - A \otimes A.
 ```
 
-Because ``M`` is bilinear in ``A``, the parameter cotangents are
+**Step 2: cached factorisation.** Same LU of ``M`` as the JVP, copied
+to Enzyme's tape so multiple reverse cotangents reuse it.
+
+**Step 3: parameter cotangents.** Since ``M`` is bilinear in ``A``,
 
 ```math
 \bar C \;\mathrel{+}=\; Y,
 \qquad
 \bar A
 \;\mathrel{+}=\;
-Y\,A\,X^\top \;+\; Y^\top\,A\,X
+Y\,A\,X^\top \;+\; Y^\top\,A\,X.
 ```
 
-— the same contractions as for `lyapd`. The Enzyme augmented primal
-copies the cached LU factorisation of ``M`` and the primal ``X`` to
-the tape; the reverse pass performs one transposed back-substitution
-against the cached ``M^\top`` and the two outer-product
-accumulations. Multiple reverse cotangents reuse the same cached
-``M``, just as forward chunks do.
+These contractions are identical to the `lyapd` case.
+
+**Step 4: code path.** `lyapdkradjointsolve` performs one transposed
+back-substitution and the two outer-product accumulations.
 
 ## References
 
@@ -143,11 +155,14 @@ accumulations. Multiple reverse cotangents reuse the same cached
   used in the primal.
 - Kao, T.-T. and Hennequin, M. (2020). *Automatic differentiation of
   Sylvester, Lyapunov, and algebraic Riccati equations.*
-  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). General recipe
-  for the JVP / VJP derivations above; the cotangent contraction
-  ``\bar A = Y A X^\top + Y^\top A X`` is the discrete-Lyapunov instance.
+  [arXiv:2011.11430](https://arxiv.org/abs/2011.11430). General recipe;
+  the cotangent contraction ``\bar A = Y A X^\top + Y^\top A X`` is the
+  discrete-Lyapunov instance.
 - MatrixEquations.jl documents the same discrete Lyapunov equation for
   [`lyapd`](https://andreasvarga.github.io/MatrixEquations.jl/latest/lyapunov.html).
+- QuantEcon Julia,
+  [Linear State Space Models](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+  — stationary covariance ``\Sigma_\infty = A\,\Sigma_\infty\,A^\top + Q``.
 
 ## Static (SMatrix) dispatch
 
@@ -199,8 +214,8 @@ true
 ```
 
 TFP fluctuates at roughly 1% in stationary equilibrium; capital, which
-absorbs cumulative TFP shocks through the policy term ``h_x[1,2]``,
-fluctuates ~25× more.
+absorbs cumulative TFP shocks through ``h_x[1,2]``, fluctuates ~25×
+more.
 
 ## Differentiating through `lyapdkr`
 

@@ -13,16 +13,11 @@ A\,X\,B \;+\; C\,X\,D \;=\; E.
 \tag{S}
 ```
 
-Define the linear operator
-
-```math
-G[X] \;=\; A\,X\,B \;+\; C\,X\,D,
-```
-
-so (S) reads ``G[X] = E``. `MatrixEquationsAD` provides ForwardDiff
-`Dual` dispatches and Enzyme forward / reverse rules for both
-front-ends; the rules share their tangent / adjoint derivations and
-differ only in which factorisation is cached.
+Define ``G[X] = A\,X\,B + C\,X\,D``, so (S) reads ``G[X] = E``.
+`MatrixEquationsAD` provides ForwardDiff `Dual` dispatches and Enzyme
+forward / reverse rules for both front-ends; the rules share their
+tangent / adjoint derivations and differ only in which factorisation is
+cached.
 
 Implementation pointers:
 
@@ -31,11 +26,10 @@ Implementation pointers:
 
 ## Primal
 
-`gsylv` uses the generalised-Schur (QZ) decompositions of
-``(A, C)`` and ``(B, D)`` from
+`gsylv` uses the generalised-Schur (QZ) decompositions of ``(A, C)``
+and ``(B, D)`` from
 [`MatrixEquations.jl`](https://andreasvarga.github.io/MatrixEquations.jl/v2.4/sylvester.html#MatrixEquations.gsylv);
-`gsylvkr` builds the Kronecker matrix
-``B^\top \otimes A + D^\top \otimes C`` directly:
+`gsylvkr` builds the Kronecker matrix directly:
 
 ```math
 \bigl(B^\top \otimes A + D^\top \otimes C\bigr)\,\operatorname{vec}(X)
@@ -102,7 +96,7 @@ true
 
 ## ForwardDiff / Enzyme JVP
 
-Differentiating (S) gives
+**Step 1: differentiate the implicit equation.** Differentiating (S),
 
 ```math
 G[d X]
@@ -112,17 +106,27 @@ d E
 \;-\; d C\,X\,D \;-\; C\,X\,d D.
 ```
 
-`gsylv` caches its generalised-Schur factors of the pairs ``(A, C)``
-and ``(B, D)`` on the value layer and reuses them for every
-chunked-`Dual` partial direction or Enzyme `BatchDuplicated` tangent —
-each lane is one triangular sweep against the shared Schur factors.
-`gsylvkr` caches the LU factorisation of
-``B^\top \otimes A + D^\top \otimes C``; chunked tangents are ``N`` LU
-back-substitutions against that single factorisation.
+i.e. ``d X`` solves another generalised Sylvester equation against the
+same operator ``G``.
+
+**Step 2: cached factorisation.**
+
+- `gsylv`: generalised-Schur (QZ) factors of the pairs ``(A, C)`` and
+  ``(B, D)``, built on the value layer.
+- `gsylvkr`: LU of ``B^\top \otimes A + D^\top \otimes C``.
+
+**Step 3: solve per direction.** One triangular sweep (`gsylv`) or LU
+back-substitution (`gsylvkr`) per tangent. Chunked-`Dual` partials and
+Enzyme `BatchDuplicated` tangents reuse the cached factorisation.
+
+**Step 4: code path.** The AD frontends in `ext/forwarddiff_sylvester.jl`
+and `ext/enzyme_sylvester.jl` build the cache on the value layer and
+dispatch one solve per lane.
 
 ## Enzyme VJP
 
-Solve the adjoint generalised Sylvester equation
+**Step 1: differentiate the implicit equation (adjoint).** Solve the
+adjoint generalised Sylvester equation
 
 ```math
 G^*[Y]
@@ -132,7 +136,11 @@ A^\top\,Y\,B^\top \;+\; C^\top\,Y\,D^\top
 \bar X.
 ```
 
-Then
+**Step 2: cached factorisation.** Same QZ factors (`gsylv`) or
+Kronecker LU (`gsylvkr`) as the JVP, stashed on Enzyme's tape so
+multiple reverse cotangents reuse it.
+
+**Step 3: parameter cotangents.**
 
 ```math
 \bar E \;\mathrel{+}=\; Y,
@@ -150,10 +158,11 @@ and
 ```
 
 The two implementations share these formulas; only the cached
-factorisation differs (generalised-Schur factors for `gsylv`,
-Kronecker LU for `gsylvkr`). In both cases the augmented primal
-stashes the cache on Enzyme's tape so multiple reverse cotangents
-reuse it without refactorising.
+factorisation differs.
+
+**Step 4: code path.** The augmented primal stores the cache;
+the reverse pass performs one adjoint solve plus the four
+outer-product accumulations.
 
 ## Differentiating through `gsylv`
 

@@ -10,16 +10,22 @@ using the Schur-based Bartels–Stewart algorithm from
 [`MatrixEquations.jl`](https://github.com/andreasvarga/MatrixEquations.jl):
 the upstream solver Schur-factorises `A` once and runs a triangular
 sweep (`MatrixEquations.lyapds!`) on the transformed right-hand side.
-For non-toy state dimensions this is the right default — the cost is
-``O(n^3)`` per solve, vs. ``O(n^6)`` for the
-[Kronecker-vec form](lyapdkr.md). `MatrixEquationsAD` provides custom
-AD rules that wrap that solver in a cache-aware shadow so a single
-`schur(A)` is reused across all tangent / cotangent directions.
+For non-toy state dimensions this is the right default — ``O(n^3)`` per
+solve, vs. ``O(n^6)`` for the [Kronecker-vec form](lyapdkr.md).
+`MatrixEquationsAD` wraps that solver in a cache-aware shadow so a
+single `schur(A)` is reused across all tangent / cotangent directions.
+
+This is the same equation that determines the stationary covariance
+``\Sigma_\infty`` of the QuantEcon
+[Linear State Space Model](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+``x_{t+1} = A\,x_t + w_{t+1}`` with ``w_t \sim \mathcal{N}(0, Q)``:
+``\Sigma_\infty = A\,\Sigma_\infty A^\top + Q``, i.e. our equation with
+``X = \Sigma_\infty`` and ``C = Q``.
 
 `MatrixEquationsAD` also exports `lyapd!(X, A, C)`, which writes the
-solution into a caller-supplied `X` and returns `nothing`. The in-place
-form shares the same Schur cache plumbing and carries an analogous full
-set of AD rules — ForwardDiff `Dual` dispatch, Enzyme forward
+solution into a caller-supplied `X` and returns `nothing`. The
+in-place form shares the same Schur cache plumbing and carries the
+full set of AD rules — ForwardDiff `Dual` dispatch, Enzyme forward
 (Duplicated / BatchDuplicated), and Enzyme reverse (augmented_primal +
 reverse). The reverse rule stashes the Schur factors on the tape so the
 adjoint pass never re-Schurs `A`. A cache-taking overload
@@ -33,9 +39,9 @@ Implementation pointers:
   shadow, and the Enzyme forward / reverse rules.
 - `ext/forwarddiff_lyapunov.jl` — the ForwardDiff `Dual` dispatch on
   `lyapd(A, C)`, which uses the same cache primitives.
-- `MatrixEquations.lyapds!` — upstream in-place kernel that operates on
-  `A` in real or complex Schur form (`adj = false / true` for transpose
-  variants).
+- `MatrixEquations.lyapds!` — upstream in-place kernel operating on
+  ``A`` in real or complex Schur form (`adj = false / true` for
+  transpose variants).
 
 ## Primal
 
@@ -47,9 +53,9 @@ L_A[X] \;=\; X \;-\; A\,X\,A^\top.
 
 The primal equation is ``L_A[X] = C``. The cache-aware shadow
 precomputes ``\mathrm{schur}(A) = (T, Z)`` with
-``A = Z\,T\,Z^\top``, and stores it in a `LyapDSchurCache`. With that
-cache available, the solve transforms the right-hand side, runs the
-upstream Schur-form kernel, and untransforms:
+``A = Z\,T\,Z^\top``, stores it in a `LyapDSchurCache`, then transforms
+the right-hand side, runs the upstream Schur-form kernel, and
+untransforms:
 
 ```math
 \tilde C \;=\; Z^\top\,C\,Z,
@@ -59,14 +65,14 @@ T\,\tilde X\,T^\top \;-\; \tilde X \;+\; \tilde C \;=\; 0,
 X \;=\; Z\,\tilde X\,Z^\top.
 ```
 
-For ``\texttt{C::Symmetric}`` this is exactly one call to
+For ``\texttt{C::Symmetric}`` this is one call to
 `lyapds!(cache.T, rhs)`; for general dense ``C`` the dispatch routes to
 `sylvds!(-cache.T, cache.T, rhs; adjB = true)`, which solves the same
 triangular system without enforcing symmetry.
 
-Existence and uniqueness require that no two eigenvalues of ``A``
-multiply to one. ``\rho(A) < 1`` is sufficient and is the case of
-interest for stationary-covariance applications below.
+Existence and uniqueness require no two eigenvalues of ``A`` multiply
+to one. ``\rho(A) < 1`` is sufficient and is the case of interest for
+stationary-covariance applications below.
 
 ## Worked example
 
@@ -109,44 +115,50 @@ true
 
 ## ForwardDiff JVP
 
-For one tangent direction ``(d A, d C)``, differentiating
-``A X A^\top - X + C = 0`` and applying the same operator gives
+**Step 1: differentiate the implicit equation.** For one tangent
+direction ``(d A, d C)``, applying ``L_A`` to ``d X`` gives another
+discrete Lyapunov equation against the same ``A``:
 
 ```math
 L_A[d X]
 \;=\;
-d C \;+\; d A\,X\,A^\top \;+\; A\,X\,d A^\top,
+d C \;+\; d A\,X\,A^\top \;+\; A\,X\,d A^\top.
 ```
 
-i.e. ``d X`` solves another discrete Lyapunov equation against the same
-``A``. The ForwardDiff dispatch builds the cache once and calls
-`lyapdsolve(cache, rhs_i)` for each partial direction in the chunk —
-``N`` `lyapds!` triangular sweeps against the shared Schur factors.
+**Step 2: cached factorisation.** The single `schur(A)` cache built on
+the value layer is shared across every tangent direction.
 
-The Enzyme `BatchDuplicated` forward rule is structurally identical:
-one `schur(A)` per outer call, then one triangular solve per tangent.
+**Step 3: solve per direction.** One `lyapds!` triangular sweep against
+the cached Schur factors per partial.
+
+**Step 4: code path.** The ForwardDiff dispatch builds the cache once
+and calls `lyapdsolve(cache, rhs_i)` for each partial direction in the
+chunk — ``N`` triangular sweeps for a chunk of width ``N``. The Enzyme
+`BatchDuplicated` forward rule is structurally identical: one
+`schur(A)` per outer call, then one triangular solve per tangent.
 
 ## Enzyme VJP
 
 The upstream Schur solver does not enforce symmetry on ``X``
 (`lyapds!` returns a symmetric result only when ``C`` is `Symmetric`),
 so the formulas below apply to the general dense map. The
-`Symmetric`-C dispatch uses the same adjoint solve, then projects the
-accumulated parameter cotangent ``\bar C`` onto the symmetric manifold
-before adding it to the shadow buffer (so a `Symmetric` parameter is
-differentiated only against symmetric perturbations).
+`Symmetric`-`C` dispatch uses the same adjoint solve, then projects
+the accumulated parameter cotangent ``\bar C`` onto the symmetric
+manifold before adding it to the shadow buffer.
 
-Let ``\bar X`` be the cotangent on the output. Define ``Y`` by the
-adjoint Lyapunov solve
+**Step 1: differentiate the implicit equation (adjoint).** Let
+``\bar X`` be the cotangent on the output. Define ``Y`` by the adjoint
+Lyapunov solve
 
 ```math
-L_A^*[Y] \;=\; Y \;-\; A^\top\,Y\,A \;=\; \bar X,
+L_A^*[Y] \;=\; Y \;-\; A^\top\,Y\,A \;=\; \bar X.
 ```
 
-implemented as `lyapdadjointsolve(cache, X̄)` (which routes to
-`lyapds!(cache.T, rhs; adj = true)` for `Symmetric` cotangents and to
-the transposed `sylvds!` variant otherwise). The parameter cotangents
-are then
+**Step 2: cached factorisation.** Same `schur(A)` as the JVP, copied to
+Enzyme's tape by the augmented primal so the reverse pass never
+re-Schurs. Multiple reverse cotangents reuse it.
+
+**Step 3: parameter cotangents.**
 
 ```math
 \bar C \;\mathrel{+}=\; Y,
@@ -156,11 +168,10 @@ are then
 Y\,A\,X^\top \;+\; Y^\top\,A\,X.
 ```
 
-The augmented primal copies the cached Schur ``(T, Z)`` and the primal
-``X`` onto the tape; the reverse pass performs one triangular adjoint
-solve plus the two outer products. Multiple reverse cotangents (e.g.
-under Enzyme `BatchReverse`) reuse the same cached Schur, exactly as
-forward chunks do.
+**Step 4: code path.** `lyapdadjointsolve(cache, X̄)` routes to
+`lyapds!(cache.T, rhs; adj = true)` for `Symmetric` cotangents and to
+the transposed `sylvds!` variant otherwise; the reverse pass then
+performs the two outer products.
 
 References:
 
@@ -170,16 +181,22 @@ References:
 - Kao and Hennequin derive forward and reverse rules for Lyapunov,
   Sylvester, and Riccati equations in
   [arXiv:2011.11430](https://arxiv.org/abs/2011.11430).
+- QuantEcon Julia,
+  [Linear State Space Models](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+  — same equation determines the stationary covariance
+  ``\Sigma_\infty = A\,\Sigma_\infty\,A^\top + Q`` of
+  ``x_{t+1} = A\,x_t + w_{t+1}``.
 
 ## Example: RBC stationary covariance, end-to-end
 
 After the Klein/Sims policy is in hand, the predetermined state evolves
 as ``x_{t+1} = h_x\, x_t + B_{\text{shock}}\,\varepsilon_{t+1}`` with
-``Q = B_{\text{shock}}\,B_{\text{shock}}^\top`` the one-step
-innovation covariance. The stationary covariance ``V`` of ``x_t``
-satisfies the discrete Lyapunov equation
-``V = h_x\,V\,h_x^\top + Q``, which is
-``A X A^\top - X + C = 0`` with ``A = h_x`` and ``C = Q``.
+innovation covariance ``Q = B_{\text{shock}}\,B_{\text{shock}}^\top``.
+Following the
+[QuantEcon Linear State Space](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+convention with ``A = h_x``, the stationary covariance ``V`` of
+``x_t`` satisfies ``V = A\,V\,A^\top + Q``, i.e. our equation with
+``C = Q``.
 
 Using the RBC policy values from the
 [Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy):
@@ -225,9 +242,8 @@ matching the cumulative-shock interpretation of ``h_x[1,2]``.
 Wrapping `Q` as `Symmetric` routes the AD rules onto the
 `lyapds!`-based path; passing a plain `Matrix` would dispatch onto the
 `sylvds!`-based path with the same result. Either way `lyapd` is the
-right call here — its cost is ``O(n^3)`` in the state dimension, and
-`MatrixEquationsAD` adds a single `schur(A)` cache reused across all AD
-directions on top.
+right call here — ``O(n^3)`` in the state dimension, with one cached
+`schur(A)` reused across AD directions.
 
 ## Differentiating through `lyapd`
 
@@ -270,20 +286,18 @@ autodiff(
 ## Example: differentiating stationary variance through the pipeline
 
 Composing parameter assembly → `klein_map` → `lyapd` gives a scalar
-function ``\tilde V_{kk}(p)`` that returns the stationary variance of
-capital under the linearised RBC model. Every AD backend supported by
-the package differentiates it end-to-end. The function below uses the
-same `rbc_first_order_assembly(p)` as the
+function ``\tilde V_{kk}(p)`` returning the stationary variance of
+capital under the linearised RBC model. Every supported AD backend
+differentiates it end-to-end. The function below uses the same
+`rbc_first_order_assembly(p)` as the
 [Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy)
-(reproduced here for self-containment) and pipes its output through
-`klein_map`, then solves the discrete Lyapunov equation
-``V = h_x V h_x^\top + Q`` with shock loading
-``B_{\text{shock}} = [0;\, \sigma]`` and innovation covariance
+(reproduced for self-containment), pipes its output through
+`klein_map`, then solves
+``V = h_x V h_x^\top + Q`` with
+``B_{\text{shock}} = [0;\, \sigma]`` and
 ``Q = B_{\text{shock}}\,B_{\text{shock}}^\top``:
 
 ```@example lyapd_pipeline
-ENV["GKSwstype"] = "100"   # GR headless backend for CI
-
 using ForwardDiff
 using MatrixEquations: lyapd
 using MatrixEquationsAD
@@ -325,10 +339,10 @@ V_kk  = stationary_capital_variance(p₀)
 ```
 
 `∇V_kk[6]` is exactly zero because ``\Omega_1`` is the measurement-noise
-standard deviation and never enters the dynamics. `∇V_kk[5] > 0` says
-larger TFP innovations raise the stationary variance of capital;
-`∇V_kk[3] > 0` says higher TFP persistence raises it through the
-cumulative-shock channel ``h_x[1,2]``.
+s.d. and never enters the dynamics. `∇V_kk[5] > 0`: larger TFP
+innovations raise the stationary variance of capital. `∇V_kk[3] > 0`:
+higher TFP persistence raises it through the cumulative-shock channel
+``h_x[1,2]``.
 
 To visualise the gradient, sweep each parameter ±5% around the baseline
 and overlay the linear tangent
@@ -354,9 +368,9 @@ end
 plot(panels...; layout = (2, 3), size = (900, 540))
 ```
 
-The dashed tangent line in each panel is exactly
+The dashed tangent in each panel is
 ``\partial V_{kk}/\partial p_i`` from ForwardDiff. The two near-flat
-panels (`σ` and `Ω_1`) are special: `Ω_1` is constant zero (it doesn't
+panels (`σ` and `Ω_1`) are special: `Ω_1` is constant zero (doesn't
 enter), and `σ` enters only through ``Q = \sigma^2`` so the curve is
 quadratic and the tangent at the baseline is shallow.
 
@@ -372,4 +386,3 @@ using Enzyme
 ```
 
 returns the same gradient to floating-point round-off.
-

@@ -89,6 +89,10 @@ jobs:
       contents: write
       pull-requests: read
       statuses: write
+    env:
+      # GR plotting backend used by Plots.jl in doc @example blocks needs
+      # to run headless on CI (no X server). 100 = file-only workstation.
+      GKSwstype: "100"
     steps:
       - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v3

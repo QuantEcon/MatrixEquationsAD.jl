@@ -2,10 +2,10 @@
 
 Automatic differentiation rules for selected
 [`MatrixEquations.jl`](https://github.com/andreasvarga/MatrixEquations.jl)
-solvers plus a Klein/Sims first-order policy-map primitive. The package
-supplies custom ForwardDiff `Dual` dispatches and Enzyme forward/reverse
-rules so the solvers integrate cleanly into AD-driven likelihood,
-calibration, and gradient-based estimation workflows.
+solvers, plus a Klein/Sims first-order policy-map primitive. The package
+adds ForwardDiff `Dual` dispatches and Enzyme forward/reverse rules so
+these solvers slot into AD-driven likelihood, calibration, and
+gradient-based estimation pipelines.
 
 ```julia
 using MatrixEquations    # primal solvers
@@ -21,10 +21,10 @@ using MatrixEquationsAD  # AD rules loaded on extension load
   parameters-to-policy example.
 - [Discrete Lyapunov (Schur)](lyapd.md) — `lyapd(A, C)` solving
   ``A X A^\top - X + C = 0`` via the Schur-based Bartels–Stewart kernel,
-  with a Schur cache reused across all AD directions.
+  with a `schur(A)` cache reused across AD directions.
 - [Kronecker Discrete Lyapunov](lyapdkr.md) — `lyapdkr(A, C)` solving
-  the same equation via the dense Kronecker LU factorisation and
-  symmetric projection of the output.
+  the same equation via the dense Kronecker LU and a symmetric
+  projection of the output.
 - [Generalised Sylvester](sylvester.md) — `gsylv(A, B, C, D, E)` and the
   Kronecker variant `gsylvkr` solving ``A X B + C X D = E``.
 - [Algebraic Riccati (DARE)](ared.md) — `ared(A, B, R, Q, S)` solving
@@ -33,8 +33,8 @@ using MatrixEquationsAD  # AD rules loaded on extension load
 
 ## Loaded extensions
 
-The custom rules live in package extensions and load automatically when
-the corresponding AD package is in scope:
+The custom rules live in package extensions that load automatically
+when the corresponding AD package is in scope:
 
 | Extension | Trigger |
 | --- | --- |
@@ -52,10 +52,19 @@ All formulas use real matrices, the Frobenius inner product
 ``\langle U, V \rangle = \operatorname{tr}(U^\top V)``, and reverse-mode
 cotangents written as barred variables such as ``\bar X``. Selection
 decisions, integer outputs, and solver branch choices are treated as
-locally constant. All linear solves below assume the corresponding
-linearised operator is nonsingular; for discrete Lyapunov, a sufficient
-condition is ``\rho(A) < 1``, while the general uniqueness condition is
-that no pair of eigenvalues of ``A`` has product equal to one.
+locally constant.
+
+State-space and filtering pages follow the
+[QuantEcon Julia](https://julia.quantecon.org/) convention
+``x_{t+1} = A\,x_t + w_{t+1}`` with ``w_t \sim \mathcal{N}(0, Q)`` and
+``y_t = G\,x_t + v_t`` with ``v_t \sim \mathcal{N}(0, R)`` (see
+[Linear State Space Models](https://julia.quantecon.org/introduction_dynamics/linear_models.html)
+and [Kalman Filter](https://julia.quantecon.org/introduction_dynamics/kalman.html)).
+
+All linear solves below assume the linearised operator is nonsingular;
+for the discrete Lyapunov equation, ``\rho(A) < 1`` is sufficient and
+the general uniqueness condition is that no pair of eigenvalues of
+``A`` has product equal to one.
 
 A short worked example differentiating `lyapd` through ForwardDiff:
 
