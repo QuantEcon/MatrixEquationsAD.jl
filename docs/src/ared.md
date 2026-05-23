@@ -236,27 +236,146 @@ plot!(ρ_range, tangent;
 scatter!([θ₀[1]], [K]; label = "baseline", markersize = 5)
 ```
 
-### Multivariate generalisation
+### Non-invertible observation: Muth permanent/transitory decomposition
 
-The same code generalises to higher-dimensional signal–noise models —
-e.g. the Muth permanent/transitory decomposition where the state is
-``[\mu_t,\, \varepsilon_t]^\top`` with ``\mu`` a random walk,
-``\varepsilon`` an AR(1), and a single noisy observation
-``y_t = \mu_t + \varepsilon_t + v_t``. The state-space matrices are
+The scalar case has an invertible observation map (``G = 1``). A more
+interesting case is when the observation pools several latent
+components and the filter must use the *dynamics* to disentangle them.
+The Muth permanent/transitory decomposition (Muth 1960; Ljungqvist &
+Sargent, optimal-linear-filtering chapter) is the canonical example:
+the state ``x_t = [\mu_t,\,\varepsilon_t]^\top`` decomposes income (or
+TFP, or any signal) into a *permanent* random-walk component and a
+*transitory* AR(1) component,
 
-```julia
-A = [1.0  0.0;
-     0.0  ρ]
-G = [1.0  1.0]
-C = [σ_ν  0.0;
-     0.0  σ_ω]
-R = reshape([σ_v^2], 1, 1)
+```math
+\mu_{t+1} \;=\; \mu_t \;+\; \nu_{t+1},
+\qquad
+\varepsilon_{t+1} \;=\; \rho\,\varepsilon_t \;+\; \omega_{t+1},
+\qquad
+\nu_t \sim \mathcal{N}(0, \sigma_\nu^2),
+\quad
+\omega_t \sim \mathcal{N}(0, \sigma_\omega^2),
 ```
 
-and `ared(A', G', R, C*C')` returns the ``2 \times 2`` stationary error
-covariance `P` and the ``1 \times 2`` Kalman gain ``K = F^\top``.
-ForwardDiff and Enzyme reverse mode propagate through both outputs
-unchanged.
+and the econometrician only observes the *sum* plus measurement noise,
+
+```math
+y_t \;=\; \mu_t \;+\; \varepsilon_t \;+\; v_t,
+\qquad
+v_t \sim \mathcal{N}(0, \sigma_v^2).
+```
+
+Stacked, ``G = \begin{bmatrix}1 & 1\end{bmatrix}`` is ``1 \times 2`` — the
+mapping from state to observation is not invertible. The filter
+nonetheless identifies both components in the limit because the two
+state coordinates have *different dynamics*: permanent shocks live
+forever while transitory shocks decay at rate ``\rho``. The Kalman gain
+``K \in \mathbb{R}^{2 \times 1}`` encodes how a unit observation
+surprise is split between updating ``\hat\mu`` and updating
+``\hat\varepsilon``.
+
+```@example muth
+ENV["GKSwstype"] = "100"   # GR headless backend for CI
+
+using ForwardDiff
+using MatrixEquations: ared
+using MatrixEquationsAD
+
+function muth_filter(ρ, σ_ν, σ_ω, σ_v)
+    T = promote_type(typeof(ρ), typeof(σ_ν), typeof(σ_ω), typeof(σ_v))
+    A_filt = T[1.0  0.0;
+               0.0  ρ]
+    G_filt = T[1.0  1.0]
+    Q      = T[σ_ν^2  0.0;
+               0.0    σ_ω^2]
+    R      = reshape(T[σ_v^2], 1, 1)
+    # LQR ↔ Kalman duality requires (A_ctrl, B_ctrl) = (A_filtᵀ, G_filtᵀ);
+    # materialise the transposes so the StridedMatrix AD dispatch fires.
+    A_ctrl = permutedims(A_filt)
+    G_ctrl = permutedims(G_filt)
+    X, _, F = ared(A_ctrl, G_ctrl, R, Q)
+    return X, permutedims(F)            # X = P (2×2), K = Fᵀ (2×1)
+end
+
+# Baseline parameters: small permanent shock, larger transitory shock,
+# unit measurement noise. ρ = 0.7 says transitory shocks decay with
+# half-life ≈ 2 periods.
+σ_ν, σ_ω, σ_v = 0.05, 0.5, 1.0
+ρ_baseline   = 0.7
+P, K = muth_filter(ρ_baseline, σ_ν, σ_ω, σ_v)
+P, K
+```
+
+The first column of `K` is the gain on the *permanent* component
+``\hat\mu_{t|t}``; the second is the gain on the *transitory*
+component ``\hat\varepsilon_{t|t}``. Their *ratio* is informative:
+when ``K_\mu / K_\varepsilon`` is large the filter attributes new
+information mostly to a shift in the permanent component, and when it
+is small the filter attributes it mostly to a transient blip.
+
+Sweep ``\rho`` over ``[0,\, 0.99]`` at fixed ``\sigma_\nu, \sigma_\omega, \sigma_v``
+and plot both gain components on the same axes:
+
+```@example muth
+using Plots
+
+ρ_grid = range(0.0, 0.99, length = 60)
+gains  = [muth_filter(ρ, σ_ν, σ_ω, σ_v)[2] for ρ in ρ_grid]
+K_μ = [g[1] for g in gains]
+K_ε = [g[2] for g in gains]
+
+plot(ρ_grid, K_μ;
+    label = "K_μ (permanent)", xlabel = "ρ (transitory AR(1) coefficient)",
+    ylabel = "Kalman gain component", legend = :left, linewidth = 2)
+plot!(ρ_grid, K_ε; label = "K_ε (transitory)", linewidth = 2)
+vline!([ρ_baseline]; label = "baseline ρ = $(ρ_baseline)", linestyle = :dot)
+```
+
+Two limits explain the shape:
+
+- **``\rho \to 0``** (no transitory autocorrelation): ``\varepsilon_t``
+  is white noise, indistinguishable from measurement noise except by
+  its variance. The filter has nothing to predict in the transitory
+  component, so ``K_\varepsilon \to 0``; nearly all updating goes into
+  ``\hat\mu``.
+- **``\rho \to 1``** (transitory is itself a random walk): the two
+  state components have identical dynamics. The filter cannot tell
+  them apart from the observation, so it splits the gain in proportion
+  to their innovation variances (here ``\sigma_\omega^2 \gg \sigma_\nu^2``,
+  so ``K_\varepsilon`` dominates).
+
+ForwardDiff returns the sensitivities of any scalar summary directly.
+For example, the *gain ratio* ``K_\mu / K_\varepsilon`` quantifies how
+permanent the filter believes the observed surprise is:
+
+```@example muth
+function gain_ratio(θ)
+    ρ, σ_ν, σ_ω, σ_v = θ
+    _, K = muth_filter(ρ, σ_ν, σ_ω, σ_v)
+    return K[1] / K[2]
+end
+
+θ₀ = [ρ_baseline, σ_ν, σ_ω, σ_v]
+∇r = ForwardDiff.gradient(gain_ratio, θ₀)
+```
+
+The signs are:
+
+- ``\partial(K_\mu/K_\varepsilon)/\partial \rho < 0`` — more persistence
+  in the transitory component makes the filter attribute *more* of a
+  surprise to ``\hat\varepsilon`` and *less* to ``\hat\mu``.
+- ``\partial(K_\mu/K_\varepsilon)/\partial \sigma_\nu > 0`` — larger
+  permanent-shock variance pushes the filter toward permanent
+  updating.
+- ``\partial(K_\mu/K_\varepsilon)/\partial \sigma_\omega < 0`` — larger
+  transitory-shock variance pushes the other way.
+- ``\partial(K_\mu/K_\varepsilon)/\partial \sigma_v`` is small — once
+  the surprise has been split, measurement noise scales both
+  components.
+
+```@example muth
+(ρ = ∇r[1], σ_ν = ∇r[2], σ_ω = ∇r[3], σ_v = ∇r[4])
+```
 
 ## Differentials and AD rules
 
