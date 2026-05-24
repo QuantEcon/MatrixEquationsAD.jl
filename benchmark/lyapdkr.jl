@@ -79,6 +79,27 @@ function lyapdkr_static_small_problem(n_tangents)
     return (; A, C, W, A_tangents, C_tangents)
 end
 
+# n = 3 lane: M is 9×9, fits in StaticArrays' native LU limit
+# (M*N ≤ 196), so the whole pipeline is fully heap-free.
+function lyapdkr_static_tiny_problem(n_tangents)
+    A = SMatrix{3, 3, Float64}(
+        [
+            0.55  0.08  0.01
+            -0.04 0.42  0.05
+            0.02  -0.03 0.36
+        ],
+    )
+    M = randn(3, 3)
+    C = SMatrix{3, 3, Float64}(0.5 .* (M + M') + 5 * I)
+    W = SMatrix{3, 3, Float64}(randn(3, 3))
+    A_tangents = ntuple(_ -> SMatrix{3, 3, Float64}(randn(3, 3)), n_tangents)
+    C_tangents = ntuple(n_tangents) do _
+        T = 0.1 .* randn(3, 3)
+        SMatrix{3, 3, Float64}(0.5 .* (T + T'))
+    end
+    return (; A, C, W, A_tangents, C_tangents)
+end
+
 lyapdkr_loss(A, C, W) = dot(W, lyapdkr(A, C))
 
 # Heap lanes: small (n = 5), medium (n_SGU), large (n_FVGQ = 14). The
@@ -377,6 +398,7 @@ LYAPDKR_SUITE["small"] = lyapdkr_group(lyapdkr_small_problem(Val(4)))
 LYAPDKR_SUITE["medium"] = lyapdkr_group(lyapdkr_medium_problem(Val(4)))
 LYAPDKR_SUITE["large"] = lyapdkr_group(lyapdkr_large_problem(Val(4)))
 LYAPDKR_SUITE["large_ws"] = lyapdkr_ws_group(lyapdkr_large_problem(Val(4)))
+LYAPDKR_SUITE["static_tiny"] = lyapdkr_static_group(lyapdkr_static_tiny_problem(Val(4)))
 LYAPDKR_SUITE["static_small"] = lyapdkr_static_group(lyapdkr_static_small_problem(Val(4)))
 
 LYAPDKR_INPLACE = BenchmarkGroup()

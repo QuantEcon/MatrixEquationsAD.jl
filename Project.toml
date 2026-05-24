@@ -18,7 +18,9 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [extensions]
 MatrixEquationsADEnzymeExt = ["Enzyme"]
+MatrixEquationsADEnzymeStaticArraysExt = ["Enzyme", "StaticArrays"]
 MatrixEquationsADForwardDiffExt = ["ForwardDiff"]
+MatrixEquationsADForwardDiffStaticArraysExt = ["ForwardDiff", "StaticArrays"]
 MatrixEquationsADStaticArraysExt = ["StaticArrays"]
 
 [compat]

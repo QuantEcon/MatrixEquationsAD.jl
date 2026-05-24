@@ -52,6 +52,34 @@ end
     )
 end
 
+@testset "lyapdkr Enzyme forward — SMatrix native (n=3)" begin
+    A3 = SMatrix{3, 3, Float64}(
+        [0.55 0.08 0.01; -0.04 0.42 0.05; 0.02 -0.03 0.36],
+    )
+    C3 = SMatrix{3, 3, Float64}(
+        [1.0 0.2 0.1; 0.2 0.7 0.05; 0.1 0.05 0.5],
+    )
+    W3 = SMatrix{3, 3, Float64}(randn(3, 3))
+
+    # n=3 random-tangent shadows are O(10); FD precision caps around
+    # 1e-5 relative, so default 1e-9 is too tight.
+    fd_kwargs = (atol = 1.0e-5, rtol = 1.0e-4)
+
+    test_forward(
+        lyapdkr, DuplicatedNoNeed,
+        (A3, Duplicated), (C3, Duplicated); fd_kwargs...
+    )
+    test_forward(
+        lyapdkr, BatchDuplicatedNoNeed,
+        (A3, BatchDuplicated), (C3, BatchDuplicated); fd_kwargs...
+    )
+    test_forward(
+        lyapdkr_weighted_sum, BatchDuplicated,
+        (A3, BatchDuplicated), (C3, BatchDuplicated), (W3, Const);
+        fd_kwargs...
+    )
+end
+
 @testset "lyapdkr Enzyme rules — M_ws workspace (FVGQ large)" begin
     Random.seed!(0x1d3f)
     fo = FVGQExampleMatrices.fvgq_first_order_inputs()

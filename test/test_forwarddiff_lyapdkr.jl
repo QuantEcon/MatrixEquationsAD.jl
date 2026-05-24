@@ -60,6 +60,37 @@ include(joinpath(@__DIR__, "example_matrices", "fvgq.jl"))
     end
 end
 
+@testset "lyapdkr ForwardDiff rules — SMatrix native (n=3)" begin
+    A3 = [0.55 0.08 0.01; -0.04 0.42 0.05; 0.02 -0.03 0.36]
+    C3 = [1.0 0.2 0.1; 0.2 0.7 0.05; 0.1 0.05 0.5]
+    x = [vec(A3); vec(C3)]
+
+    function lyapdkr_static_vec3(x::AbstractVector)
+        A = SMatrix{3, 3, eltype(x)}(reshape(x[1:9], 3, 3))
+        C = SMatrix{3, 3, eltype(x)}(reshape(x[10:18], 3, 3))
+        return vec(lyapdkr(A, C))
+    end
+    function lyapdkr_heap_vec3(x::AbstractVector)
+        A = reshape(x[1:9], 3, 3)
+        C = reshape(x[10:18], 3, 3)
+        return vec(lyapdkr(A, C))
+    end
+
+    @test lyapdkr_static_vec3(x) ≈ lyapdkr_heap_vec3(x)
+    J_static = ForwardDiff.jacobian(lyapdkr_static_vec3, x)
+    J_heap = ForwardDiff.jacobian(lyapdkr_heap_vec3, x)
+    @test J_static ≈ J_heap
+
+    # Inferred type — Dual SMatrix → Dual SMatrix
+    A3s = SMatrix{3, 3, Float64}(A3)
+    C3s = SMatrix{3, 3, Float64}(C3)
+    x_dual = map(v -> Dual{Nothing}(v, one(v)), x)
+    A_dual = SMatrix{3, 3, eltype(x_dual)}(reshape(x_dual[1:9], 3, 3))
+    C_dual = SMatrix{3, 3, eltype(x_dual)}(reshape(x_dual[10:18], 3, 3))
+    X_dual = @inferred lyapdkr(A_dual, C_dual)
+    @test X_dual isa SMatrix{3, 3, <:Dual}
+end
+
 @testset "lyapdkr ForwardDiff rules — M_ws workspace (FVGQ large)" begin
     fo = FVGQExampleMatrices.fvgq_first_order_inputs()
     A = fo.h_x

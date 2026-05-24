@@ -31,6 +31,44 @@ include(joinpath(@__DIR__, "example_matrices", "fvgq.jl"))
     @test norm(As * Xs * As' - Xs + Cs) < 1.0e-12
 end
 
+@testset "lyapdkr primal — SMatrix native (n=3 native LU, n=5 LU fallback)" begin
+    # n = 3: M is 9×9, fits StaticArrays' native LU limit (≤ 14×14) so the
+    # whole pipeline is heap-free.
+    A3 = SMatrix{3, 3, Float64}(
+        [0.55 0.08 0.01; -0.04 0.42 0.05; 0.02 -0.03 0.36],
+    )
+    C3 = SMatrix{3, 3, Float64}(
+        [1.0 0.2 0.1; 0.2 0.7 0.05; 0.1 0.05 0.5],
+    )
+    X3 = @inferred lyapdkr(A3, C3)
+    @test X3 isa SMatrix{3, 3, Float64}
+    @test Matrix(X3) ≈ lyapd(Matrix(A3), Matrix(C3))
+    @test issymmetric(Matrix(X3))
+    @test norm(A3 * X3 * A3' - X3 + C3) < 1.0e-12
+
+    lyapdkr(A3, C3)  # warm up
+    @test (@allocated lyapdkr(A3, C3)) == 0          # fully heap-free at n=3
+
+    # n = 5: M is 25×25, exceeds native limit → StaticArrays falls back to
+    # heap LU. Output still static and correct.
+    A5 = SMatrix{5, 5, Float64}(
+        [
+            0.55  0.08  0.01  -0.02 0.0
+            -0.04 0.42  0.05  0.01  -0.01
+            0.02  -0.03 0.36  0.04  0.0
+            0.0   0.02  -0.05 0.48  0.03
+            -0.01 0.0   0.02  -0.04 0.51
+        ],
+    )
+    Csym = let M = randn(5, 5); 0.5 .* (M + M') + 5 * I(5); end
+    C5 = SMatrix{5, 5, Float64}(Csym)
+    X5 = @inferred lyapdkr(A5, C5)
+    @test X5 isa SMatrix{5, 5, Float64}
+    @test Matrix(X5) ≈ lyapd(Matrix(A5), Matrix(C5))
+    @test issymmetric(Matrix(X5))
+    @test norm(A5 * X5 * A5' - X5 + C5) < 1.0e-10
+end
+
 @testset "lyapdkr primal — M_ws workspace (FVGQ large)" begin
     fo = FVGQExampleMatrices.fvgq_first_order_inputs()
     A = fo.h_x

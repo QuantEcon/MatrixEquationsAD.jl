@@ -1,6 +1,6 @@
 module MatrixEquationsADStaticArraysExt
 
-using LinearAlgebra: I
+using LinearAlgebra: I, lu
 using MatrixEquationsAD: MatrixEquationsAD
 using StaticArrays: SMatrix
 
@@ -34,9 +34,22 @@ function klein_map(
     )
 end
 
-function lyapdkr(A::SMatrix{n, n, T}, C::SMatrix{n, n, T}) where {n, T}
-    X = MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C))
-    return SMatrix{n, n, T}(X)
+function lyapdkr(
+        A::SMatrix{N, N, T}, C::SMatrix{N, N, T};
+        M_ws = nothing,  # accepted for API parity with the heap path; ignored
+    ) where {N, T}
+    # StaticArrays caps native LU at total elements ≤ 14×14 = 196. For the
+    # `n²×n²` pencil that means truly heap-free only at N ≤ 3. Past N ≥ 4,
+    # SA's LU fallback wraps a heap LU back into static form which costs
+    # more than just running the heap path once — so dispatch by size.
+    # N is a type parameter so the compiler folds this branch.
+    if N * N <= 14
+        M = build_M!!(nothing, A)
+        F = lu(M)
+        return symmetrize!!(SMatrix{N, N, T}(F \ vec(C)))
+    else
+        return SMatrix{N, N, T}(MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C)))
+    end
 end
 
 end
