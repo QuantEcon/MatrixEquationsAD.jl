@@ -6,12 +6,6 @@
 # symmetrized, so nonsymmetric perturbations of C are projected onto the
 # symmetric solution manifold.
 
-@concrete struct LyapDKrLUCache
-    M
-    ipiv
-    info::Int
-end
-
 @inline function _build_lyapdkr_matrix!(M, A, n)
     @inbounds for l in 1:n, k in 1:n
         col = k + (l - 1) * n
@@ -56,47 +50,17 @@ end
     return X
 end
 
-function lyapdkrfactor(A::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
-    n = checksquare(A)
-    M = Matrix{T}(undef, n * n, n * n)
-    _build_lyapdkr_matrix!(M, A, n)
-    F = lu!(M; check = false)
-    if !issuccess(F)
-        throw(ErrorException("lyapdkr: LU factorization of (I - A⊗A) failed"))
-    end
-    return LyapDKrLUCache(M, F.ipiv, 0)
-end
-
-function lyapdkrsolve(cache::LyapDKrLUCache, C::StridedMatrix{T}) where {T}
-    n = checksquare(C)
-    if n * n != size(cache.M, 1)
-        throw(DimensionMismatch("lyapdkr: A and C must be the same size"))
-    end
-    rhs = vec(copy(C))
-    F = LU(cache.M, cache.ipiv, cache.info)
-    ldiv!(F, rhs)
-    X = reshape(rhs, n, n)
-    return _symmetrize_square!(X, n)
-end
-
-function lyapdkradjointsolve(cache::LyapDKrLUCache, Xbar::StridedMatrix{T}) where {T}
-    n = checksquare(Xbar)
-    if n * n != size(cache.M, 1)
-        throw(DimensionMismatch("lyapdkr: A and Xbar must be the same size"))
-    end
-    rhs_mat = _symmetrize_square!(copy(Xbar), n)
-    rhs = vec(rhs_mat)
-    F = LU(cache.M, cache.ipiv, cache.info)
-    ldiv!(transpose(F), rhs)
-    return reshape(rhs, n, n)
-end
-
 function lyapdkr(
         A::StridedMatrix{T}, C::StridedMatrix{T};
-        tol_diag::Real = Inf, check_psd::Bool = false
+        tol_diag::Real = Inf, check_psd::Bool = false,
     ) where {T <: Union{Float32, Float64}}
-    cache = lyapdkrfactor(A)
-    X = lyapdkrsolve(cache, C)
+    n = size(A, 1)
+    M = Matrix{T}(undef, n * n, n * n)
+    _build_lyapdkr_matrix!(M, A, n)
+    F = lu!(M)
+    X = copy(C)
+    ldiv!(F, vec(X))
+    _symmetrize_square!(X, n)
     _lyapdkr_check!(X, tol_diag, check_psd)
     return X
 end

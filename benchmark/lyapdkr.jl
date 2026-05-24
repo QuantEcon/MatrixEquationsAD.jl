@@ -9,6 +9,7 @@ using StaticArrays: SMatrix
 
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "rbc.jl"))
 include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "sgu.jl"))
+include(joinpath(pkgdir(MatrixEquationsAD), "test", "example_matrices", "fvgq.jl"))
 
 function lyapdkr_dual_matrix(A, tangents::NTuple{N}) where {N}
     return map(A, tangents...) do a, ds...
@@ -48,6 +49,21 @@ function lyapdkr_medium_problem(n_tangents)
     return (; A, C, W, A_tangents, C_tangents)
 end
 
+function lyapdkr_large_problem(n_tangents)
+    fo = FVGQExampleMatrices.fvgq_first_order_inputs()
+    A = fo.h_x
+    B = fo.B_shock
+    n = size(A, 1)
+    C = B * B' + 1.0e-6 * I(n)
+    W = randn(n, n)
+    A_tangents = ntuple(_ -> randn(n, n), n_tangents)
+    C_tangents = ntuple(n_tangents) do _
+        M = 0.1 .* randn(n, n)
+        0.5 .* (M + M')
+    end
+    return (; A, C, W, A_tangents, C_tangents)
+end
+
 function lyapdkr_static_small_problem(n_tangents)
     problem = lyapdkr_small_problem(n_tangents)
     n = size(problem.A, 1)
@@ -65,9 +81,10 @@ end
 
 lyapdkr_loss(A, C, W) = dot(W, lyapdkr(A, C))
 
-# Per plan §3, no large-pencil lyapdkr lanes — the Kronecker operator is
-# n²×n² and stops being competitive past n ≈ 15. Heap small / medium and
-# the static_small lane cover the size range where lyapdkr is interesting.
+# Heap lanes: small (n = 5), medium (n_SGU), large (n_FVGQ = 14). The
+# Kronecker operator is n²×n² so past n ≈ 15 lyapdkr stops being
+# competitive; the `large` lane is included to expose AD overheads at the
+# upper edge of the useful range.
 function lyapdkr_group(problem)
     g = BenchmarkGroup()
 
@@ -156,5 +173,6 @@ end
 LYAPDKR_SUITE = BenchmarkGroup()
 LYAPDKR_SUITE["small"] = lyapdkr_group(lyapdkr_small_problem(Val(4)))
 LYAPDKR_SUITE["medium"] = lyapdkr_group(lyapdkr_medium_problem(Val(4)))
+LYAPDKR_SUITE["large"] = lyapdkr_group(lyapdkr_large_problem(Val(4)))
 LYAPDKR_SUITE["static_small"] = lyapdkr_static_group(lyapdkr_static_small_problem(Val(4)))
 LYAPDKR_SUITE

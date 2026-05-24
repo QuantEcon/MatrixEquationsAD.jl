@@ -2,7 +2,7 @@ module MatrixEquationsAD
 
 using ConcreteStructs: @concrete
 using LinearAlgebra:
-    LU, Symmetric, UpperTriangular, checksquare, issuccess, ldiv!, lu!, mul!,
+    Symmetric, UpperTriangular, checksquare, ldiv!, lu!, mul!,
     ordschur!, schur
 using MatrixEquations: MatrixEquations, lyapds!, sylvds!, utqu, utqu!
 
