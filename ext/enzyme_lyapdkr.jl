@@ -14,21 +14,36 @@ function EnzymeRules.forward(
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
 
-    dXs = ntuple(Val(N)) do i
-        Base.@_inline_meta
-        dX = if typeof(C) <: Const
-            zero(C.val)
+    # Pack tangent RHSs into a single n × n × N tensor so we can do one
+    # BLAS-3 multi-RHS solve instead of N per-tangent solves. `XAt` / `AX`
+    # are reused across tangents.
+    RHS = Array{T, 3}(undef, n, n, N)
+    if !(typeof(A) <: Const)
+        XAt = X * A.val'
+        AX = A.val * X
+    end
+    @inbounds for i in 1:N
+        dX = view(RHS, :, :, i)
+        if typeof(C) <: Const
+            fill!(dX, zero(T))
         else
-            copy(N == 1 ? C.dval : C.dval[i])
+            dX .= N == 1 ? C.dval : C.dval[i]
         end
         if !(typeof(A) <: Const)
             dA = N == 1 ? A.dval : A.dval[i]
-            dX .+= dA * X * A.val'
-            dX .+= A.val * X * dA'
+            mul!(dX, dA, XAt, one(T), one(T))
+            mul!(dX, AX, dA', one(T), one(T))
         end
-        ldiv!(F, vec(dX))
-        _symmetrize_square!(dX, n)
-        dX
+    end
+    ldiv!(F, reshape(RHS, n * n, N))
+    @inbounds for i in 1:N
+        _symmetrize_square!(view(RHS, :, :, i), n)
+    end
+    # Materialize shadows as standalone Matrix — Enzyme requires the
+    # shadow type to match the primal (Matrix), not a SubArray view.
+    dXs = ntuple(Val(N)) do i
+        Base.@_inline_meta
+        copy(view(RHS, :, :, i))
     end
 
     if EnzymeRules.needs_primal(config) && EnzymeRules.needs_shadow(config)

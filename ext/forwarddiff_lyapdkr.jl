@@ -12,22 +12,33 @@ function lyapdkr(
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
 
-    dXs = ntuple(Val(N)) do i
-        Base.@_inline_meta
-        dX = map(x -> partials(x, i), C)
-        dA = map(x -> partials(x, i), A)
-        dX .+= dA * X * Aval'
-        dX .+= Aval * X * dA'
-        ldiv!(F, vec(dX))
-        _symmetrize_square!(dX, n)
-        dX
+    # Pack tangent RHSs into a single n × n × N tensor so we can do one
+    # BLAS-3 multi-RHS solve instead of N per-tangent solves. `XAt` / `AX`
+    # are reused across all tangents; `dA_scratch` is filled in place from
+    # the i'th partial of `A` each iteration.
+    RHS = Array{V, 3}(undef, n, n, N)
+    dA_scratch = Matrix{V}(undef, n, n)
+    XAt = X * Aval'
+    AX = Aval * X
+    @inbounds for i in 1:N
+        dX = view(RHS, :, :, i)
+        for ix in eachindex(dX, C)
+            dX[ix] = partials(C[ix], i)
+            dA_scratch[ix] = partials(A[ix], i)
+        end
+        mul!(dX, dA_scratch, XAt, one(V), one(V))
+        mul!(dX, AX, dA_scratch', one(V), one(V))
+    end
+    ldiv!(F, reshape(RHS, n * n, N))
+    @inbounds for i in 1:N
+        _symmetrize_square!(view(RHS, :, :, i), n)
     end
 
     return map(CartesianIndices(X)) do idx
         Base.@_inline_meta
         Dual{T}(
             X[idx],
-            Partials(ntuple(k -> dXs[k][idx], Val(N))),
+            Partials(ntuple(k -> RHS[idx, k], Val(N))),
         )
     end
 end
