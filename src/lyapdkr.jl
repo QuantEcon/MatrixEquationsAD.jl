@@ -7,16 +7,10 @@
 # symmetric solution manifold.
 
 @inline function _build_lyapdkr_matrix!(M, A, n)
-    @inbounds for l in 1:n, k in 1:n
-        col = k + (l - 1) * n
-        for j in 1:n, i in 1:n
-            row = i + (j - 1) * n
-            v = -A[j, l] * A[i, k]
-            if i == k && j == l
-                v += one(v)
-            end
-            M[row, col] = v
-        end
+    kron!(M, A, A)
+    M .= .-M
+    @inbounds for i in 1:(n * n)
+        M[i, i] += one(eltype(M))
     end
     return M
 end
