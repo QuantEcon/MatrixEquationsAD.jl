@@ -4,11 +4,13 @@ using LinearAlgebra: I
 using MatrixEquationsAD: MatrixEquationsAD
 using StaticArrays: SMatrix
 
-import MatrixEquationsAD: build_M!!, klein_map, lyapdkr
+import MatrixEquationsAD: build_M!!, klein_map, lyapdkr, symmetrize!!
 
 @inline function build_M!!(_, A::SMatrix{N, N, T}) where {N, T}
     return SMatrix{N * N, N * N, T}(I) - kron(A, A)
 end
+
+@inline symmetrize!!(X::SMatrix) = (X + X') / 2
 
 function klein_map(
         A::SMatrix{n, n, T}, B::SMatrix{n, n, T}, ::Val{n_x};

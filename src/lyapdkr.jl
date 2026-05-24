@@ -15,12 +15,12 @@
     return M
 end
 
-@inline function _symmetrize_square!(X, n)
-    @inbounds for j in 1:n
-        for i in (j + 1):n
-            s = 0.5 * (X[i, j] + X[j, i])
-            X[i, j] = s
-            X[j, i] = s
+@inline function symmetrize!!(X::AbstractMatrix)
+    @inbounds for j in axes(X, 2)
+        for i in 1:(j - 1)
+            v = (X[i, j] + X[j, i]) * 0.5
+            X[i, j] = v
+            X[j, i] = v
         end
     end
     return X
@@ -35,6 +35,6 @@ function lyapdkr(
     F = lu!(M)
     X = copy(C)
     ldiv!(F, vec(X))
-    _symmetrize_square!(X, n)
+    symmetrize!!(X)
     return X
 end

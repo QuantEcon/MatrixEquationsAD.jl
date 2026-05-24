@@ -65,7 +65,7 @@ function _ared_tangent(
     rhs .+= F' * dR * F
     rhs .-= dS * F
     rhs .-= F' * dS'
-    _symmetrize_square!(rhs, size(rhs, 1))
+    symmetrize!!(rhs)
     dX = lyapdsolve(cache, rhs)
 
     dM = dB' * X * A
@@ -91,7 +91,7 @@ function _ared_adjoint!(
     G = R + B' * X * B
     Λ = G' \ Fbar
     Θ = -Λ * F'
-    _symmetrize_square!(Θ, size(Θ, 1))
+    symmetrize!!(Θ)
 
     dA .+= X' * B * Λ
     dB .+= X * A * Λ'
@@ -103,7 +103,7 @@ function _ared_adjoint!(
     Xbar_total = copy(Xbar)
     Xbar_total .+= B * Λ * A'
     Xbar_total .+= B * Θ * B'
-    _symmetrize_square!(Xbar_total, size(Xbar_total, 1))
+    symmetrize!!(Xbar_total)
 
     Y = lyapdadjointsolve(cache, Xbar_total)
 

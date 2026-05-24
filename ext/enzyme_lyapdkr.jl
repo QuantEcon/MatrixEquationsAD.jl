@@ -12,7 +12,7 @@ function EnzymeRules.forward(
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))
-    _symmetrize_square!(X, n)
+    symmetrize!!(X)
 
     # Pack tangent RHSs into a single n × n × N tensor so we can do one
     # BLAS-3 multi-RHS solve instead of N per-tangent solves. `XAt` / `AX`
@@ -37,7 +37,7 @@ function EnzymeRules.forward(
     end
     ldiv!(F, reshape(RHS, n * n, N))
     @inbounds for i in 1:N
-        _symmetrize_square!(view(RHS, :, :, i), n)
+        symmetrize!!(view(RHS, :, :, i))
     end
     # Materialize shadows as standalone Matrix — Enzyme requires the
     # shadow type to match the primal (Matrix), not a SubArray view.
@@ -70,7 +70,7 @@ function EnzymeRules.augmented_primal(
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))
-    _symmetrize_square!(X, n)
+    symmetrize!!(X)
     dXs = EnzymeRules.width(config) == 1 ? zero(X) :
         ntuple(_ -> zero(X), Val(EnzymeRules.width(config)))
 
@@ -97,7 +97,7 @@ function EnzymeRules.reverse(
     for i in 1:N
         Xbar = N == 1 ? dXs : dXs[i]
         Y = copy(Xbar)
-        _symmetrize_square!(Y, n)
+        symmetrize!!(Y)
         ldiv!(transpose(F), vec(Y))
 
         if !(typeof(C) <: Const)

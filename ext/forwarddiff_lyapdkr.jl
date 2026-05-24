@@ -10,7 +10,7 @@ function lyapdkr(
     F = lu!(M)
     X = copy(Cval)
     ldiv!(F, vec(X))
-    _symmetrize_square!(X, n)
+    symmetrize!!(X)
 
     # Pack tangent RHSs into a single n × n × N tensor so we can do one
     # BLAS-3 multi-RHS solve instead of N per-tangent solves. `XAt` / `AX`
@@ -31,7 +31,7 @@ function lyapdkr(
     end
     ldiv!(F, reshape(RHS, n * n, N))
     @inbounds for i in 1:N
-        _symmetrize_square!(view(RHS, :, :, i), n)
+        symmetrize!!(view(RHS, :, :, i))
     end
 
     return map(CartesianIndices(X)) do idx

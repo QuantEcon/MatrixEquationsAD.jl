@@ -26,7 +26,7 @@ end
 
 function _symmetric_part_like(C::Symmetric, A)
     rhs = copy(A)
-    _symmetrize_square!(rhs, size(rhs, 1))
+    symmetrize!!(rhs)
     return Symmetric(rhs, Symbol(C.uplo))
 end
 
