@@ -11,7 +11,7 @@ using LinearAlgebra:
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
     LyapDSchurCache, build_M!!, symmetrize!!,
-    klein_map, klein_map!, lyapd!, lyapdfactor, lyapdkr, lyapdsolve
+    klein_map, klein_map!, lyapd!, lyapdfactor, lyapdkr, lyapdkr!, lyapdsolve
 
 include("forwarddiff_lyapunov.jl")
 include("forwarddiff_lyapdkr.jl")

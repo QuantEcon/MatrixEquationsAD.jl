@@ -3,12 +3,13 @@ function EnzymeRules.forward(
         func::Const{typeof(lyapdkr)},
         ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
     N = EnzymeRules.width(config)
     n = size(A.val, 1)
-    M = Matrix{T}(undef, n * n, n * n)
-    M = build_M!!(M, A.val)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A.val)
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))
@@ -62,11 +63,12 @@ function EnzymeRules.augmented_primal(
         func::Const{typeof(lyapdkr)},
         ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT, T <: Union{Float32, Float64}}
     n = size(A.val, 1)
-    M = Matrix{T}(undef, n * n, n * n)
-    M = build_M!!(M, A.val)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A.val)
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))
@@ -88,7 +90,8 @@ function EnzymeRules.reverse(
         ::Type{RT},
         tape,
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT, T <: Union{Float32, Float64}}
     X, dXs, F, Aval = tape
     N = EnzymeRules.width(config)
@@ -116,4 +119,110 @@ function EnzymeRules.reverse(
     end
 
     return (nothing, nothing)
+end
+
+# ─── Enzyme rules for lyapdkr! ──────────────────────────────────────────────
+#
+# `lyapdkr!` writes the solution into the caller-supplied `X`. The rule
+# overwrites `X.val` with the primal and (in forward mode) `X.dval[i]` with
+# each tangent solution. Reverse mode pulls upstream gradients from
+# `X.dval`, solves the adjoint into `A.dval` / `C.dval`, then zeros
+# `X.dval` (X was overwritten so any prior gradient on X is gone).
+
+function EnzymeRules.forward(
+        config::EnzymeRules.FwdConfig,
+        func::Const{typeof(lyapdkr!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
+    ) where {RT, T <: Union{Float32, Float64}}
+    n = size(A.val, 1)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A.val)
+    F = lu!(M)
+    copyto!(X.val, C.val)
+    ldiv!(F, vec(X.val))
+    symmetrize!!(X.val)
+
+    typeof(X) <: Const && return nothing
+
+    N = EnzymeRules.width(config)
+    for i in 1:N
+        dX = N == 1 ? X.dval : X.dval[i]
+        if typeof(C) <: Const
+            fill!(dX, zero(T))
+        else
+            copyto!(dX, N == 1 ? C.dval : C.dval[i])
+        end
+        if !(typeof(A) <: Const)
+            dA = N == 1 ? A.dval : A.dval[i]
+            dX .+= dA * X.val * A.val'
+            dX .+= A.val * X.val * dA'
+        end
+        ldiv!(F, vec(dX))
+        symmetrize!!(dX)
+    end
+    return nothing
+end
+
+function EnzymeRules.augmented_primal(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapdkr!)},
+        ::Type{RT},
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
+    ) where {RT, T <: Union{Float32, Float64}}
+    n = size(A.val, 1)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A.val)
+    F = lu!(M)
+    copyto!(X.val, C.val)
+    ldiv!(F, vec(X.val))
+    symmetrize!!(X.val)
+    tape = (copy(X.val), F, copy(A.val))
+    return EnzymeRules.AugmentedReturn(nothing, nothing, tape)
+end
+
+function EnzymeRules.reverse(
+        config::EnzymeRules.RevConfig,
+        func::Const{typeof(lyapdkr!)},
+        ::Type{RT},
+        tape,
+        X::Annotation{<:StridedMatrix{T}},
+        A::Annotation{<:StridedMatrix{T}},
+        C::Annotation{<:StridedMatrix{T}};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
+    ) where {RT, T <: Union{Float32, Float64}}
+    Xval, F, Aval = tape
+    N = EnzymeRules.width(config)
+    n = size(Xval, 1)
+
+    typeof(X) <: Const && return (nothing, nothing, nothing)
+
+    for i in 1:N
+        Xbar = N == 1 ? X.dval : X.dval[i]
+        Y = copy(Xbar)
+        symmetrize!!(Y)
+        ldiv!(transpose(F), vec(Y))
+
+        if !(typeof(C) <: Const)
+            dC = N == 1 ? C.dval : C.dval[i]
+            dC .+= Y
+        end
+        if !(typeof(A) <: Const)
+            dA = N == 1 ? A.dval : A.dval[i]
+            tmp = Y * Aval
+            mul!(dA, tmp, Xval', one(T), one(T))
+            tmp = Y' * Aval
+            mul!(dA, tmp, Xval, one(T), one(T))
+        end
+
+        fill!(Xbar, zero(T))
+    end
+
+    return (nothing, nothing, nothing)
 end

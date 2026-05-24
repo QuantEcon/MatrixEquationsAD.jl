@@ -7,7 +7,7 @@ import Enzyme.EnzymeRules
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
     LyapDSchurCache, build_M!!, symmetrize!!,
-    klein_map, klein_map!, lyapd!, lyapdadjointsolve, lyapdfactor, lyapdkr,
+    klein_map, klein_map!, lyapd!, lyapdadjointsolve, lyapdfactor, lyapdkr, lyapdkr!,
     lyapdsolve
 using ConcreteStructs: @concrete
 using Enzyme:

@@ -27,13 +27,29 @@ end
 end
 
 function lyapdkr(
-        A::StridedMatrix{T}, C::StridedMatrix{T},
+        A::StridedMatrix{T}, C::StridedMatrix{T};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {T <: Union{Float32, Float64}}
     n = size(A, 1)
-    M = Matrix{T}(undef, n * n, n * n)
-    M = build_M!!(M, A)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A)
     F = lu!(M)
     X = copy(C)
+    ldiv!(F, vec(X))
+    symmetrize!!(X)
+    return X
+end
+
+function lyapdkr!(
+        X::StridedMatrix{T},
+        A::StridedMatrix{T}, C::StridedMatrix{T};
+        M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
+    ) where {T <: Union{Float32, Float64}}
+    n = size(A, 1)
+    M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
+    build_M!!(M, A)
+    F = lu!(M)
+    copyto!(X, C)
     ldiv!(F, vec(X))
     symmetrize!!(X)
     return X

@@ -1,11 +1,13 @@
 using FiniteDifferences: central_fdm, jvp
 using ForwardDiff
 using ForwardDiff: Dual
-using LinearAlgebra: issymmetric
+using LinearAlgebra: I, issymmetric
 using MatrixEquations
 using MatrixEquationsAD
 using StaticArrays: SMatrix
 using Test
+
+include(joinpath(@__DIR__, "example_matrices", "fvgq.jl"))
 
 @testset "lyapdkr ForwardDiff rules" begin
     A = [0.55 0.08; -0.04 0.42]
@@ -56,4 +58,54 @@ using Test
         @test issymmetric(ad)
         @test ad ≈ fd
     end
+end
+
+@testset "lyapdkr ForwardDiff rules — M_ws workspace (FVGQ large)" begin
+    fo = FVGQExampleMatrices.fvgq_first_order_inputs()
+    A = fo.h_x
+    B = fo.B_shock
+    n = size(A, 1)
+    C = B * B' + 1.0e-6 * I(n)
+    M_ws = Matrix{Float64}(undef, n * n, n * n)
+
+    # Probe vector covering both A and C entries
+    x = [vec(A); vec(C)]
+    lyapdkr_vec(x) = vec(lyapdkr(reshape(x[1:(n * n)], n, n),
+                                 reshape(x[(n * n + 1):end], n, n)))
+    function lyapdkr_vec_ws(x)
+        return vec(
+            lyapdkr(
+                reshape(x[1:(n * n)], n, n),
+                reshape(x[(n * n + 1):end], n, n);
+                M_ws,
+            ),
+        )
+    end
+
+    @test lyapdkr_vec_ws(x) ≈ lyapdkr_vec(x)
+
+    J = ForwardDiff.jacobian(lyapdkr_vec, x)
+    J_ws = ForwardDiff.jacobian(lyapdkr_vec_ws, x)
+    @test J ≈ J_ws
+end
+
+@testset "lyapdkr! ForwardDiff rules" begin
+    A = [0.55 0.08; -0.04 0.42]
+    C = [1.0 0.2; 0.2 0.7]
+    x = [vec(A); vec(C)]
+
+    function lyapdkr_inplace_vec(x::AbstractVector{V}) where {V}
+        A_x = reshape(x[1:4], 2, 2)
+        C_x = reshape(x[5:8], 2, 2)
+        Xout = Matrix{V}(undef, 2, 2)
+        lyapdkr!(Xout, A_x, C_x)
+        return vec(Xout)
+    end
+
+    J = ForwardDiff.jacobian(lyapdkr_inplace_vec, x)
+    J_oop = ForwardDiff.jacobian(x -> vec(lyapdkr(
+                reshape(x[1:4], 2, 2),
+                reshape(x[5:8], 2, 2),
+            )), x)
+    @test J ≈ J_oop
 end

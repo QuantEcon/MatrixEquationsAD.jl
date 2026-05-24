@@ -1,12 +1,13 @@
 function lyapdkr(
         A::StridedMatrix{<:Dual{T, V, N}},
-        C::StridedMatrix{<:Dual{T, V, N}},
+        C::StridedMatrix{<:Dual{T, V, N}};
+        M_ws::Union{Nothing, StridedMatrix{V}} = nothing,
     ) where {T, V <: Union{Float32, Float64}, N}
     Aval = map(value, A)
     Cval = map(value, C)
     n = size(Aval, 1)
-    M = Matrix{V}(undef, n * n, n * n)
-    M = build_M!!(M, Aval)
+    M = isnothing(M_ws) ? Matrix{V}(undef, n * n, n * n) : M_ws
+    build_M!!(M, Aval)
     F = lu!(M)
     X = copy(Cval)
     ldiv!(F, vec(X))
@@ -41,4 +42,47 @@ function lyapdkr(
             Partials(ntuple(k -> RHS[idx, k], Val(N))),
         )
     end
+end
+
+function lyapdkr!(
+        Xout::StridedMatrix{<:Dual{T, V, N}},
+        A::StridedMatrix{<:Dual{T, V, N}},
+        C::StridedMatrix{<:Dual{T, V, N}};
+        M_ws::Union{Nothing, StridedMatrix{V}} = nothing,
+    ) where {T, V <: Union{Float32, Float64}, N}
+    Aval = map(value, A)
+    Cval = map(value, C)
+    n = size(Aval, 1)
+    M = isnothing(M_ws) ? Matrix{V}(undef, n * n, n * n) : M_ws
+    build_M!!(M, Aval)
+    F = lu!(M)
+    X = copy(Cval)
+    ldiv!(F, vec(X))
+    symmetrize!!(X)
+
+    RHS = Array{V, 3}(undef, n, n, N)
+    dA_scratch = Matrix{V}(undef, n, n)
+    XAt = X * Aval'
+    AX = Aval * X
+    @inbounds for i in 1:N
+        dX = view(RHS, :, :, i)
+        for ix in eachindex(dX, C)
+            dX[ix] = partials(C[ix], i)
+            dA_scratch[ix] = partials(A[ix], i)
+        end
+        mul!(dX, dA_scratch, XAt, one(V), one(V))
+        mul!(dX, AX, dA_scratch', one(V), one(V))
+    end
+    ldiv!(F, reshape(RHS, n * n, N))
+    @inbounds for i in 1:N
+        symmetrize!!(view(RHS, :, :, i))
+    end
+
+    @inbounds for idx in CartesianIndices(X)
+        Xout[idx] = Dual{T}(
+            X[idx],
+            Partials(ntuple(k -> RHS[idx, k], Val(N))),
+        )
+    end
+    return Xout
 end

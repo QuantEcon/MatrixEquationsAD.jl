@@ -6,7 +6,7 @@ using LinearAlgebra:
     ordschur!, schur
 using MatrixEquations: MatrixEquations, lyapds!, sylvds!, utqu, utqu!
 
-export klein_map, klein_map!, lyapd!, lyapdkr
+export klein_map, klein_map!, lyapd!, lyapdkr, lyapdkr!
 
 include("lyapdkr.jl")
 include("klein_map.jl")
