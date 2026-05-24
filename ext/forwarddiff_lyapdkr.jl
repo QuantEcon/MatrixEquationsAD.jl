@@ -6,7 +6,7 @@ function lyapdkr(
     Cval = map(value, C)
     n = size(Aval, 1)
     M = Matrix{V}(undef, n * n, n * n)
-    _build_lyapdkr_matrix!(M, Aval, n)
+    M = build_M!!(M, Aval)
     F = lu!(M)
     X = copy(Cval)
     ldiv!(F, vec(X))

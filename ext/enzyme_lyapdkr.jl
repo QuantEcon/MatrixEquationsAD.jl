@@ -8,7 +8,7 @@ function EnzymeRules.forward(
     N = EnzymeRules.width(config)
     n = size(A.val, 1)
     M = Matrix{T}(undef, n * n, n * n)
-    _build_lyapdkr_matrix!(M, A.val, n)
+    M = build_M!!(M, A.val)
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))
@@ -51,7 +51,7 @@ function EnzymeRules.augmented_primal(
     ) where {RT, T <: Union{Float32, Float64}}
     n = size(A.val, 1)
     M = Matrix{T}(undef, n * n, n * n)
-    _build_lyapdkr_matrix!(M, A.val, n)
+    M = build_M!!(M, A.val)
     F = lu!(M)
     X = copy(C.val)
     ldiv!(F, vec(X))

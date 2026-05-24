@@ -6,10 +6,10 @@
 # symmetrized, so nonsymmetric perturbations of C are projected onto the
 # symmetric solution manifold.
 
-@inline function _build_lyapdkr_matrix!(M, A, n)
+@inline function build_M!!(M, A)
     kron!(M, A, A)
     M .= .-M
-    @inbounds for i in 1:(n * n)
+    @inbounds for i in 1:size(M, 1)
         M[i, i] += one(eltype(M))
     end
     return M
@@ -31,7 +31,7 @@ function lyapdkr(
     ) where {T <: Union{Float32, Float64}}
     n = size(A, 1)
     M = Matrix{T}(undef, n * n, n * n)
-    _build_lyapdkr_matrix!(M, A, n)
+    M = build_M!!(M, A)
     F = lu!(M)
     X = copy(C)
     ldiv!(F, vec(X))
