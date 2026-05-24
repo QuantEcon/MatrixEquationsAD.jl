@@ -1,7 +1,6 @@
 function lyapdkr(
         A::StridedMatrix{<:Dual{T, V, N}},
-        C::StridedMatrix{<:Dual{T, V, N}};
-        tol_diag::Real = Inf, check_psd::Bool = false,
+        C::StridedMatrix{<:Dual{T, V, N}},
     ) where {T, V <: Union{Float32, Float64}, N}
     Aval = map(value, A)
     Cval = map(value, C)
@@ -12,7 +11,6 @@ function lyapdkr(
     X = copy(Cval)
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
-    _lyapdkr_check!(X, tol_diag, check_psd)
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta

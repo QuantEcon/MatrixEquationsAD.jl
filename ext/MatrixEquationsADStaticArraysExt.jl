@@ -27,11 +27,8 @@ function klein_map(
     )
 end
 
-function lyapdkr(
-        A::SMatrix{n, n, T}, C::SMatrix{n, n, T};
-        tol_diag::Real = Inf, check_psd::Bool = false,
-    ) where {n, T}
-    X = MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C); tol_diag, check_psd)
+function lyapdkr(A::SMatrix{n, n, T}, C::SMatrix{n, n, T}) where {n, T}
+    X = MatrixEquationsAD.lyapdkr(Matrix(A), Matrix(C))
     return SMatrix{n, n, T}(X)
 end
 

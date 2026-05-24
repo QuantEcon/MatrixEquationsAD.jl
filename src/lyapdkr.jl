@@ -26,27 +26,8 @@ end
     return X
 end
 
-@inline function _lyapdkr_check!(X::AbstractMatrix, tol_diag::Real, check_psd::Bool)
-    n = checksquare(X)
-    @inbounds for idx in eachindex(X)
-        if !isfinite(X[idx])
-            throw(ErrorException("lyapdkr: non-finite entry"))
-        end
-    end
-    @inbounds for i in 1:n
-        if abs(X[i, i]) > tol_diag
-            throw(ErrorException("lyapdkr: |X[$i,$i]| exceeds tol_diag"))
-        end
-        if check_psd && X[i, i] < 0
-            throw(ErrorException("lyapdkr: X[$i,$i] < 0 (non-PSD)"))
-        end
-    end
-    return X
-end
-
 function lyapdkr(
-        A::StridedMatrix{T}, C::StridedMatrix{T};
-        tol_diag::Real = Inf, check_psd::Bool = false,
+        A::StridedMatrix{T}, C::StridedMatrix{T},
     ) where {T <: Union{Float32, Float64}}
     n = size(A, 1)
     M = Matrix{T}(undef, n * n, n * n)
@@ -55,6 +36,5 @@ function lyapdkr(
     X = copy(C)
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
-    _lyapdkr_check!(X, tol_diag, check_psd)
     return X
 end

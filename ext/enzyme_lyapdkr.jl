@@ -3,8 +3,7 @@ function EnzymeRules.forward(
         func::Const{typeof(lyapdkr)},
         ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}};
-        tol_diag::Real = Inf, check_psd::Bool = false,
+        C::Annotation{<:StridedMatrix{T}},
     ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
     N = EnzymeRules.width(config)
     n = size(A.val, 1)
@@ -14,7 +13,6 @@ function EnzymeRules.forward(
     X = copy(C.val)
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
-    _lyapdkr_check!(X, tol_diag, check_psd)
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta
@@ -49,8 +47,7 @@ function EnzymeRules.augmented_primal(
         func::Const{typeof(lyapdkr)},
         ::Type{RT},
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}};
-        tol_diag::Real = Inf, check_psd::Bool = false,
+        C::Annotation{<:StridedMatrix{T}},
     ) where {RT, T <: Union{Float32, Float64}}
     n = size(A.val, 1)
     M = Matrix{T}(undef, n * n, n * n)
@@ -59,7 +56,6 @@ function EnzymeRules.augmented_primal(
     X = copy(C.val)
     ldiv!(F, vec(X))
     _symmetrize_square!(X, n)
-    _lyapdkr_check!(X, tol_diag, check_psd)
     dXs = EnzymeRules.width(config) == 1 ? zero(X) :
         ntuple(_ -> zero(X), Val(EnzymeRules.width(config)))
 
@@ -77,8 +73,7 @@ function EnzymeRules.reverse(
         ::Type{RT},
         tape,
         A::Annotation{<:StridedMatrix{T}},
-        C::Annotation{<:StridedMatrix{T}};
-        tol_diag::Real = Inf, check_psd::Bool = false,
+        C::Annotation{<:StridedMatrix{T}},
     ) where {RT, T <: Union{Float32, Float64}}
     X, dXs, F, Aval = tape
     N = EnzymeRules.width(config)

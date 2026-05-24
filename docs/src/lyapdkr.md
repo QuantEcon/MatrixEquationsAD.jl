@@ -50,10 +50,9 @@ Assumptions:
 
 - ``M`` nonsingular — equivalently, no pair of eigenvalues of ``A``
   has product equal to one. ``\rho(A) < 1`` is sufficient.
-- Optional diagnostics: `tol_diag` bounds ``|X_{ii}|`` and `check_psd`
-  rejects negative diagonals.
 
-Failures throw `ErrorException`.
+A singular ``M`` raises `SingularException` from `lu!`. Callers that
+need PSD / magnitude checks on the returned ``X`` own them.
 
 ## Worked example
 
@@ -169,7 +168,7 @@ back-substitution and the two outer-product accumulations.
 The StaticArrays extension provides
 
 ```julia
-lyapdkr(A::SMatrix{n,n,T}, C::SMatrix{n,n,T}; tol_diag=Inf, check_psd=false)
+lyapdkr(A::SMatrix{n,n,T}, C::SMatrix{n,n,T})
 ```
 
 which converts to heap, calls the regular `lyapdkr`, and wraps the
