@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Discrete Lyapunov (Schur) · MatrixEquationsAD.jl</title><meta name="title" content="Discrete Lyapunov (Schur) · MatrixEquationsAD.jl"/><meta property="og:title" content="Discrete Lyapunov (Schur) · MatrixEquationsAD.jl"/><meta property="twitter:title" content="Discrete Lyapunov (Schur) · MatrixEquationsAD.jl"/><meta name="description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="twitter:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/lyapd/"/><meta property="twitter:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/lyapd/"/><link rel="canonical" href="https://QuantEcon.github.io/MatrixEquationsAD.jl/lyapd/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MatrixEquationsAD.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../klein_map/">Klein Policy Map</a></li><li class="is-active"><a class="tocitem" href>Discrete Lyapunov (Schur)</a><ul class="internal"><li><a class="tocitem" href="#Primal"><span>Primal</span></a></li><li><a class="tocitem" href="#Worked-example"><span>Worked example</span></a></li><li><a class="tocitem" href="#ForwardDiff-JVP"><span>ForwardDiff JVP</span></a></li><li><a class="tocitem" href="#Enzyme-VJP"><span>Enzyme VJP</span></a></li><li><a class="tocitem" href="#Example:-RBC-stationary-covariance,-end-to-end"><span>Example: RBC stationary covariance, end-to-end</span></a></li><li><a class="tocitem" href="#Differentiating-through-lyapd"><span>Differentiating through <code>lyapd</code></span></a></li><li><a class="tocitem" href="#Example:-differentiating-stationary-variance-through-the-pipeline"><span>Example: differentiating stationary variance through the pipeline</span></a></li></ul></li><li><a class="tocitem" href="../lyapdkr/">Kronecker Discrete Lyapunov</a></li><li><a class="tocitem" href="../sylvester/">Generalised Sylvester</a></li><li><a class="tocitem" href="../ared/">Algebraic Riccati (DARE)</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Discrete Lyapunov (Schur)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Discrete Lyapunov (Schur)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/docs/src/lyapd.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Discrete-Lyapunov-(Schur)"><a class="docs-heading-anchor" href="#Discrete-Lyapunov-(Schur)">Discrete Lyapunov (Schur)</a><a id="Discrete-Lyapunov-(Schur)-1"></a><a class="docs-heading-anchor-permalink" href="#Discrete-Lyapunov-(Schur)" title="Permalink"></a></h1><p><code>lyapd(A, C)</code> solves the discrete Lyapunov equation</p><p class="math-container">\[A X A^\top - X + C = 0\]</p><p>using the Schur-based Bartels–Stewart algorithm from <a href="https://github.com/andreasvarga/MatrixEquations.jl"><code>MatrixEquations.jl</code></a>: the upstream solver Schur-factorises <code>A</code> once and runs a triangular sweep (<code>MatrixEquations.lyapds!</code>) on the transformed right-hand side. For non-toy state dimensions this is the right default — <span>$O(n^3)$</span> per solve, vs. <span>$O(n^6)$</span> for the <a href="../lyapdkr/">Kronecker-vec form</a>. <code>MatrixEquationsAD</code> wraps that solver in a cache-aware shadow so a single <code>schur(A)</code> is reused across all tangent / cotangent directions.</p><p>This is the same equation that determines the stationary covariance <span>$\Sigma_\infty$</span> of the QuantEcon <a href="https://julia.quantecon.org/introduction_dynamics/linear_models.html">Linear State Space Model</a> <span>$x_{t+1} = A\,x_t + w_{t+1}$</span> with <span>$w_t \sim \mathcal{N}(0, Q)$</span>: <span>$\Sigma_\infty = A\,\Sigma_\infty A^\top + Q$</span>, i.e. our equation with <span>$X = \Sigma_\infty$</span> and <span>$C = Q$</span>.</p><p><code>MatrixEquationsAD</code> also exports <code>lyapd!(X, A, C)</code>, which writes the solution into a caller-supplied <code>X</code> and returns <code>nothing</code>. The in-place form shares the same Schur cache plumbing and carries the full set of AD rules — ForwardDiff <code>Dual</code> dispatch, Enzyme forward (Duplicated / BatchDuplicated), and Enzyme reverse (augmented_primal + reverse). The reverse rule stashes the Schur factors on the tape so the adjoint pass never re-Schurs <code>A</code>. A cache-taking overload <code>lyapd!(X, cache::LyapDSchurCache, C)</code> lets the AD rules share one <code>schur(A)</code> across all forward tangent directions or reverse cotangents.</p><p>Implementation pointers:</p><ul><li><code>ext/enzyme_lyapunov.jl</code> — <code>LyapDSchurCache</code>, <code>lyapdfactor</code>, <code>lyapdsolve</code>, <code>lyapdadjointsolve</code>, the cache-aware <code>lyapd(A, C)</code> shadow, and the Enzyme forward / reverse rules.</li><li><code>ext/forwarddiff_lyapunov.jl</code> — the ForwardDiff <code>Dual</code> dispatch on <code>lyapd(A, C)</code>, which uses the same cache primitives.</li><li><code>MatrixEquations.lyapds!</code> — upstream in-place kernel operating on <span>$A$</span> in real or complex Schur form (<code>adj = false / true</code> for transpose variants).</li></ul><h2 id="Primal"><a class="docs-heading-anchor" href="#Primal">Primal</a><a id="Primal-1"></a><a class="docs-heading-anchor-permalink" href="#Primal" title="Permalink"></a></h2><p>Define the linear operator</p><p class="math-container">\[L_A[X] \;=\; X \;-\; A\,X\,A^\top.\]</p><p>The primal equation is <span>$L_A[X] = C$</span>. The cache-aware shadow precomputes <span>$\mathrm{schur}(A) = (T, Z)$</span> with <span>$A = Z\,T\,Z^\top$</span>, stores it in a <code>LyapDSchurCache</code>, then transforms the right-hand side, runs the upstream Schur-form kernel, and untransforms:</p><p class="math-container">\[\tilde C \;=\; Z^\top\,C\,Z,
+\qquad
+T\,\tilde X\,T^\top \;-\; \tilde X \;+\; \tilde C \;=\; 0,
+\qquad
+X \;=\; Z\,\tilde X\,Z^\top.\]</p><p>For <span>$\texttt{C::Symmetric}$</span> this is one call to <code>lyapds!(cache.T, rhs)</code>; for general dense <span>$C$</span> the dispatch routes to <code>sylvds!(-cache.T, cache.T, rhs; adjB = true)</code>, which solves the same triangular system without enforcing symmetry.</p><p>Existence and uniqueness require no two eigenvalues of <span>$A$</span> multiply to one. <span>$\rho(A) &lt; 1$</span> is sufficient and is the case of interest for stationary-covariance applications below.</p><h2 id="Worked-example"><a class="docs-heading-anchor" href="#Worked-example">Worked example</a><a id="Worked-example-1"></a><a class="docs-heading-anchor-permalink" href="#Worked-example" title="Permalink"></a></h2><p>A 2×2 sanity case:</p><pre><code class="language-julia-repl hljs">julia&gt; using MatrixEquations: lyapd
+
+julia&gt; using MatrixEquationsAD
+
+julia&gt; A = [0.55 0.08; -0.04 0.42]
+2×2 Matrix{Float64}:
+  0.55  0.08
+ -0.04  0.42
+
+julia&gt; C = [1.0 0.2; 0.2 0.7]
+2×2 Matrix{Float64}:
+ 1.0  0.2
+ 0.2  0.7
+
+julia&gt; X = lyapd(A, C)
+2×2 Matrix{Float64}:
+ 1.47343   0.253679
+ 0.253679  0.84244
+
+julia&gt; isapprox(A * X * A&#39; - X + C, zeros(2, 2); atol = 1.0e-12)
+true</code></pre><p><code>lyapd!</code> writes the same <code>X</code> into a caller-supplied buffer:</p><pre><code class="language-julia-repl hljs">julia&gt; Xip = zeros(2, 2);
+
+julia&gt; lyapd!(Xip, A, C);
+
+julia&gt; Xip == X
+true</code></pre><h2 id="ForwardDiff-JVP"><a class="docs-heading-anchor" href="#ForwardDiff-JVP">ForwardDiff JVP</a><a id="ForwardDiff-JVP-1"></a><a class="docs-heading-anchor-permalink" href="#ForwardDiff-JVP" title="Permalink"></a></h2><p><strong>Step 1: differentiate the implicit equation.</strong> For one tangent direction <span>$(d A, d C)$</span>, applying <span>$L_A$</span> to <span>$d X$</span> gives another discrete Lyapunov equation against the same <span>$A$</span>:</p><p class="math-container">\[L_A[d X]
+\;=\;
+d C \;+\; d A\,X\,A^\top \;+\; A\,X\,d A^\top.\]</p><p><strong>Step 2: cached factorisation.</strong> The single <code>schur(A)</code> cache built on the value layer is shared across every tangent direction.</p><p><strong>Step 3: solve per direction.</strong> One <code>lyapds!</code> triangular sweep against the cached Schur factors per partial.</p><p><strong>Step 4: code path.</strong> The ForwardDiff dispatch builds the cache once and calls <code>lyapdsolve(cache, rhs_i)</code> for each partial direction in the chunk — <span>$N$</span> triangular sweeps for a chunk of width <span>$N$</span>. The Enzyme <code>BatchDuplicated</code> forward rule is structurally identical: one <code>schur(A)</code> per outer call, then one triangular solve per tangent.</p><h2 id="Enzyme-VJP"><a class="docs-heading-anchor" href="#Enzyme-VJP">Enzyme VJP</a><a id="Enzyme-VJP-1"></a><a class="docs-heading-anchor-permalink" href="#Enzyme-VJP" title="Permalink"></a></h2><p>The upstream Schur solver does not enforce symmetry on <span>$X$</span> (<code>lyapds!</code> returns a symmetric result only when <span>$C$</span> is <code>Symmetric</code>), so the formulas below apply to the general dense map. The <code>Symmetric</code>-<code>C</code> dispatch uses the same adjoint solve, then projects the accumulated parameter cotangent <span>$\bar C$</span> onto the symmetric manifold before adding it to the shadow buffer.</p><p><strong>Step 1: differentiate the implicit equation (adjoint).</strong> Let <span>$\bar X$</span> be the cotangent on the output. Define <span>$Y$</span> by the adjoint Lyapunov solve</p><p class="math-container">\[L_A^*[Y] \;=\; Y \;-\; A^\top\,Y\,A \;=\; \bar X.\]</p><p><strong>Step 2: cached factorisation.</strong> Same <code>schur(A)</code> as the JVP, copied to Enzyme&#39;s tape by the augmented primal so the reverse pass never re-Schurs. Multiple reverse cotangents reuse it.</p><p><strong>Step 3: parameter cotangents.</strong></p><p class="math-container">\[\bar C \;\mathrel{+}=\; Y,
+\qquad
+\bar A
+\;\mathrel{+}=\;
+Y\,A\,X^\top \;+\; Y^\top\,A\,X.\]</p><p><strong>Step 4: code path.</strong> <code>lyapdadjointsolve(cache, X̄)</code> routes to <code>lyapds!(cache.T, rhs; adj = true)</code> for <code>Symmetric</code> cotangents and to the transposed <code>sylvds!</code> variant otherwise; the reverse pass then performs the two outer products.</p><p>References:</p><ul><li>MatrixEquations.jl documents <code>lyapd</code> as solving <span>$A X A^\top - X + C = 0$</span> in its <a href="https://andreasvarga.github.io/MatrixEquations.jl/latest/lyapunov.html">Lyapunov solver documentation</a>.</li><li>Kao and Hennequin derive forward and reverse rules for Lyapunov, Sylvester, and Riccati equations in <a href="https://arxiv.org/abs/2011.11430">arXiv:2011.11430</a>.</li><li>QuantEcon Julia, <a href="https://julia.quantecon.org/introduction_dynamics/linear_models.html">Linear State Space Models</a> — same equation determines the stationary covariance <span>$\Sigma_\infty = A\,\Sigma_\infty\,A^\top + Q$</span> of <span>$x_{t+1} = A\,x_t + w_{t+1}$</span>.</li></ul><h2 id="Example:-RBC-stationary-covariance,-end-to-end"><a class="docs-heading-anchor" href="#Example:-RBC-stationary-covariance,-end-to-end">Example: RBC stationary covariance, end-to-end</a><a id="Example:-RBC-stationary-covariance,-end-to-end-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-RBC-stationary-covariance,-end-to-end" title="Permalink"></a></h2><p>After the Klein/Sims policy is in hand, the predetermined state evolves as <span>$x_{t+1} = h_x\, x_t + B_{\text{shock}}\,\varepsilon_{t+1}$</span> with innovation covariance <span>$Q = B_{\text{shock}}\,B_{\text{shock}}^\top$</span>. Following the <a href="https://julia.quantecon.org/introduction_dynamics/linear_models.html">QuantEcon Linear State Space</a> convention with <span>$A = h_x$</span>, the stationary covariance <span>$V$</span> of <span>$x_t$</span> satisfies <span>$V = A\,V\,A^\top + Q$</span>, i.e. our equation with <span>$C = Q$</span>.</p><p>Using the RBC policy values from the <a href="../klein_map/#quick-start:-parameters-to-policy">Klein Policy Map quick start</a>:</p><pre><code class="language-julia-repl hljs">julia&gt; using LinearAlgebra: Symmetric
+
+julia&gt; using MatrixEquations: lyapd
+
+julia&gt; using MatrixEquationsAD
+
+julia&gt; h_x = [
+           0.9568351489231556  6.209371005755667;
+           -3.3737787177631822e-18  0.20000000000000004
+       ]
+2×2 Matrix{Float64}:
+  0.956835     6.20937
+ -3.37378e-18  0.2
+
+julia&gt; B_shock = reshape([0.0, -0.01], 2, 1)
+2×1 Matrix{Float64}:
+  0.0
+ -0.01
+
+julia&gt; Q = Symmetric(B_shock * transpose(B_shock))
+2×2 Symmetric{Float64, Matrix{Float64}}:
+ 0.0  0.0
+ 0.0  0.0001
+
+julia&gt; V = lyapd(h_x, Q)
+2×2 Matrix{Float64}:
+ 0.0700541    0.000159976
+ 0.000159976  0.000104167
+
+julia&gt; V[2, 2] ≈ 0.01^2 / (1 - 0.2^2)   # matches AR(1) closed form
+true</code></pre><p>The TFP stationary standard deviation is <span>$\sigma/\sqrt{1-\rho^2}$</span>, ~1%; the implied capital standard deviation <span>$\sqrt{V_{11}}$</span> is ~26%, matching the cumulative-shock interpretation of <span>$h_x[1,2]$</span>.</p><p>Wrapping <code>Q</code> as <code>Symmetric</code> routes the AD rules onto the <code>lyapds!</code>-based path; passing a plain <code>Matrix</code> would dispatch onto the <code>sylvds!</code>-based path with the same result. Either way <code>lyapd</code> is the right call here — <span>$O(n^3)$</span> in the state dimension, with one cached <code>schur(A)</code> reused across AD directions.</p><h2 id="Differentiating-through-lyapd"><a class="docs-heading-anchor" href="#Differentiating-through-lyapd">Differentiating through <code>lyapd</code></a><a id="Differentiating-through-lyapd-1"></a><a class="docs-heading-anchor-permalink" href="#Differentiating-through-lyapd" title="Permalink"></a></h2><p>ForwardDiff against a scalar loss:</p><pre><code class="language-julia hljs">using ForwardDiff
+using MatrixEquations: lyapd
+using MatrixEquationsAD
+
+A = [0.55 0.08; -0.04 0.42]
+C = [1.0  0.2;  0.2 0.7]
+
+loss(A, C) = sum(lyapd(A, C))
+∇A = ForwardDiff.gradient(A -&gt; loss(A, C), A)</code></pre><p>Enzyme reverse on the same loss:</p><pre><code class="language-julia hljs">using Enzyme: Active, Const, Duplicated, Reverse, autodiff, make_zero
+using LinearAlgebra: dot
+using MatrixEquations: lyapd
+using MatrixEquationsAD
+
+A = [0.55 0.08; -0.04 0.42]
+C = [1.0  0.2;  0.2 0.7]
+W = [0.4 -0.1; -0.1 0.7]
+
+weighted(A, C, W) = dot(W, lyapd(A, C))
+
+A_bar = make_zero(A);  C_bar = make_zero(C)
+autodiff(
+    Reverse, weighted, Active,
+    Duplicated(A, A_bar), Duplicated(C, C_bar), Const(W),
+)
+# A_bar, C_bar now hold the gradients.</code></pre><h2 id="Example:-differentiating-stationary-variance-through-the-pipeline"><a class="docs-heading-anchor" href="#Example:-differentiating-stationary-variance-through-the-pipeline">Example: differentiating stationary variance through the pipeline</a><a id="Example:-differentiating-stationary-variance-through-the-pipeline-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-differentiating-stationary-variance-through-the-pipeline" title="Permalink"></a></h2><p>Composing parameter assembly → <code>klein_map</code> → <code>lyapd</code> gives a scalar function <span>$\tilde V_{kk}(p)$</span> returning the stationary variance of capital under the linearised RBC model. Every supported AD backend differentiates it end-to-end. The function below uses the same <code>rbc_first_order_assembly(p)</code> as the <a href="../klein_map/#quick-start:-parameters-to-policy">Klein Policy Map quick start</a> (reproduced for self-containment), pipes its output through <code>klein_map</code>, then solves <span>$V = h_x V h_x^\top + Q$</span> with <span>$B_{\text{shock}} = [0;\, \sigma]$</span> and <span>$Q = B_{\text{shock}}\,B_{\text{shock}}^\top$</span>:</p><pre><code class="language-julia hljs">using ForwardDiff
+using MatrixEquations: lyapd
+using MatrixEquationsAD
+
+function rbc_first_order_assembly(p)
+    α, β, ρ, δ, _σ, _Ω_1 = p
+    rk   = (1 / β - 1 + δ) / α
+    k_ss = rk^(1 / (α - 1))
+    y_ss = k_ss^α
+    c_ss = y_ss - δ * k_ss
+    mpk  = α * k_ss^(α - 1)
+    k_col, z_col, c_col, y_col, i_col = 1, 2, 3, 4, 5
+    T = promote_type(typeof(α), typeof(β), typeof(δ), typeof(k_ss))
+    A = zeros(T, 5, 5); B = zeros(T, 5, 5)
+    A[1, k_col] = -β * (α - 1) * mpk / k_ss / c_ss
+    A[1, z_col] = -β * mpk / c_ss
+    A[1, c_col] = inv(c_ss^2)
+    B[1, c_col] = -inv(c_ss^2)
+    A[2, k_col] = one(T); B[2, k_col] = -(one(T) - δ)
+    B[2, c_col] = one(T); B[2, y_col] = -one(T)
+    B[3, k_col] = -mpk;   B[3, z_col] = -y_ss; B[3, y_col] = one(T)
+    A[4, z_col] = one(T); B[4, z_col] = -ρ
+    A[5, k_col] = -one(T); B[5, k_col] = one(T) - δ; B[5, i_col] = one(T)
+    return A, B, 2
+end
+
+function stationary_capital_variance(p)
+    A, B, _ = rbc_first_order_assembly(p)
+    r = klein_map(A, B; threshold = 1.0e-6)
+    σ = p[5]
+    Q = [0.0 0.0; 0.0 σ^2]
+    V = lyapd(r.h_x, Q)
+    return V[1, 1]
+end
+
+p₀ = [0.5, 0.95, 0.2, 0.02, 0.01, 0.01]
+V_kk  = stationary_capital_variance(p₀)
+∇V_kk = ForwardDiff.gradient(stationary_capital_variance, p₀)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">6-element Vector{Float64}:
+  1.5845282579959985
+  3.3366434883225433
+  0.16170067029558388
+ -3.0395243515293036
+ 14.01082234634419
+  0.0</code></pre><p><code>∇V_kk[6]</code> is exactly zero because <span>$\Omega_1$</span> is the measurement-noise s.d. and never enters the dynamics. <code>∇V_kk[5] &gt; 0</code>: larger TFP innovations raise the stationary variance of capital. <code>∇V_kk[3] &gt; 0</code>: higher TFP persistence raises it through the cumulative-shock channel <span>$h_x[1,2]$</span>.</p><p>To visualise the gradient, sweep each parameter ±5% around the baseline and overlay the linear tangent <span>$V_{kk}(p_0) + \partial V_{kk}/\partial p_i\,(p_i - p_{0,i})$</span>:</p><pre><code class="language-julia hljs">using Plots
+
+labels = [&quot;α&quot;, &quot;β&quot;, &quot;ρ&quot;, &quot;δ&quot;, &quot;σ&quot;, &quot;Ω_1&quot;]
+panels = map(1:6) do i
+    p_range = range(0.95 * p₀[i], 1.05 * p₀[i], length = 25)
+    V_curve = map(p_range) do p_i
+        q = copy(p₀); q[i] = p_i
+        stationary_capital_variance(q)
+    end
+    tangent = V_kk .+ ∇V_kk[i] .* (p_range .- p₀[i])
+    plt = plot(p_range, V_curve;
+        label = &quot;V_kk&quot;, xlabel = labels[i], ylabel = &quot;V_kk&quot;,
+        legend = :outerbottom)
+    plot!(plt, p_range, tangent; label = &quot;tangent&quot;, linestyle = :dash)
+    plt
+end
+plot(panels...; layout = (2, 3), size = (900, 540))</code></pre><img src="f2c8927a.svg" alt="Example block output"/><p>The dashed tangent in each panel is <span>$\partial V_{kk}/\partial p_i$</span> from ForwardDiff. The two near-flat panels (<code>σ</code> and <code>Ω_1</code>) are special: <code>Ω_1</code> is constant zero (doesn&#39;t enter), and <code>σ</code> enters only through <span>$Q = \sigma^2$</span> so the curve is quadratic and the tangent at the baseline is shallow.</p><p>Switching backends is a one-line change. With <a href="https://github.com/JuliaDiff/DifferentiationInterface.jl"><code>DifferentiationInterface.jl</code></a>:</p><pre><code class="language-julia hljs">using DifferentiationInterface: AutoEnzyme, gradient
+using Enzyme
+
+∇V_kk_enzyme = gradient(stationary_capital_variance,
+                        AutoEnzyme(mode = Enzyme.Reverse), p₀)</code></pre><p>returns the same gradient to floating-point round-off.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../klein_map/">« Klein Policy Map</a><a class="docs-footer-nextpage" href="../lyapdkr/">Kronecker Discrete Lyapunov »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 25 May 2026 11:09">Monday 25 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
