@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Algebraic Riccati (DARE) · MatrixEquationsAD.jl</title><meta name="title" content="Algebraic Riccati (DARE) · MatrixEquationsAD.jl"/><meta property="og:title" content="Algebraic Riccati (DARE) · MatrixEquationsAD.jl"/><meta property="twitter:title" content="Algebraic Riccati (DARE) · MatrixEquationsAD.jl"/><meta name="description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="twitter:description" content="Documentation for MatrixEquationsAD.jl."/><meta property="og:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/ared/"/><meta property="twitter:url" content="https://QuantEcon.github.io/MatrixEquationsAD.jl/ared/"/><link rel="canonical" href="https://QuantEcon.github.io/MatrixEquationsAD.jl/ared/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">MatrixEquationsAD.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../klein_map/">Klein Policy Map</a></li><li><a class="tocitem" href="../lyapd/">Discrete Lyapunov (Schur)</a></li><li><a class="tocitem" href="../lyapdkr/">Kronecker Discrete Lyapunov</a></li><li><a class="tocitem" href="../sylvester/">Generalised Sylvester</a></li><li class="is-active"><a class="tocitem" href>Algebraic Riccati (DARE)</a><ul class="internal"><li><a class="tocitem" href="#Primal-assumptions"><span>Primal assumptions</span></a></li><li><a class="tocitem" href="#Worked-example"><span>Worked example</span></a></li><li><a class="tocitem" href="#Example:-stationary-Kalman-filter-via-DARE-duality"><span>Example: stationary Kalman filter via DARE duality</span></a></li><li><a class="tocitem" href="#Differentials-and-AD-rules"><span>Differentials and AD rules</span></a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Algebraic Riccati (DARE)</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Algebraic Riccati (DARE)</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/QuantEcon/MatrixEquationsAD.jl/blob/main/docs/src/ared.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Algebraic-Riccati-(DARE)"><a class="docs-heading-anchor" href="#Algebraic-Riccati-(DARE)">Algebraic Riccati (DARE)</a><a id="Algebraic-Riccati-(DARE)-1"></a><a class="docs-heading-anchor-permalink" href="#Algebraic-Riccati-(DARE)" title="Permalink"></a></h1><p><code>ared(A, B, R, Q, S)</code> solves the discrete algebraic Riccati equation</p><p class="math-container">\[A^\top X A - X
+\;-\; (A^\top X B + S)\,(R + B^\top X B)^{-1}\,(B^\top X A + S^\top)
+\;+\; Q
+\;=\;
+0
+\tag{DARE}\]</p><p>via the generalised-eigenproblem method of Arnold and Laub (<code>MatrixEquations.jl</code>&#39;s <a href="https://andreasvarga.github.io/MatrixEquations.jl/dev/riccati.html">Riccati solvers</a>). The four-argument call <code>ared(A, B, R, Q)</code> is the <span>$S = 0$</span> shorthand. The solver returns the stabilising symmetric solution <span>$X$</span> and the optimal-LQR gain</p><p class="math-container">\[F \;=\; G^{-1}(B^\top X A + S^\top),
+\qquad
+G \;=\; R + B^\top X B,\]</p><p>so the closed-loop dynamics are <span>$A_c = A - B F$</span>. <code>MatrixEquationsAD</code> differentiates both outputs (<code>X</code> and <code>F</code>) under ForwardDiff and Enzyme.</p><p>Implementation pointers:</p><ul><li><code>ext/enzyme_riccati.jl</code>, <code>ext/forwarddiff_riccati.jl</code> — AD frontends.</li><li><code>ext/riccati_derivatives.jl</code> — shared tangent / adjoint plan.</li></ul><h2 id="Primal-assumptions"><a class="docs-heading-anchor" href="#Primal-assumptions">Primal assumptions</a><a id="Primal-assumptions-1"></a><a class="docs-heading-anchor-permalink" href="#Primal-assumptions" title="Permalink"></a></h2><p>The rule assumes the selected stabilising (or anti-stabilising) Riccati branch is locally smooth, <span>$G = R + B^\top X B$</span> is nonsingular, and the closed-loop Lyapunov operator <span>$L_{A_c}[\Delta X] = \Delta X - A_c^\top \Delta X A_c$</span> is nonsingular. The usual sufficient conditions are stabilisability and detectability, together with a well-conditioned positive-definite <span>$G$</span>.</p><h2 id="Worked-example"><a class="docs-heading-anchor" href="#Worked-example">Worked example</a><a id="Worked-example-1"></a><a class="docs-heading-anchor-permalink" href="#Worked-example" title="Permalink"></a></h2><p>A 2-state, 1-input LQR:</p><pre><code class="language-julia-repl hljs">julia&gt; using MatrixEquations: ared
+
+julia&gt; A = [0.95 0.0; 0.0 0.8]
+2×2 Matrix{Float64}:
+ 0.95  0.0
+ 0.0   0.8
+
+julia&gt; B = reshape([1.0, 0.5], 2, 1)
+2×1 Matrix{Float64}:
+ 1.0
+ 0.5
+
+julia&gt; R = reshape([0.1], 1, 1)
+1×1 Matrix{Float64}:
+ 0.1
+
+julia&gt; Q = [1.0 0.0; 0.0 1.0]
+2×2 Matrix{Float64}:
+ 1.0  0.0
+ 0.0  1.0
+
+julia&gt; X, _, F = ared(A, B, R, Q);
+
+julia&gt; X
+2×2 Matrix{Float64}:
+  1.62885   -0.937017
+ -0.937017   2.61078
+
+julia&gt; F
+1×2 Matrix{Float64}:
+ 0.763104  0.204009
+
+julia&gt; # Closed-loop Schur stability: ρ(A - B F) &lt; 1
+       using LinearAlgebra: eigvals
+
+julia&gt; maximum(abs, eigvals(A - B * F)) &lt; 1
+true</code></pre><p>The primal residual of (DARE) is <span>$\approx 0$</span>; the stabilising gain <code>F</code> keeps the closed-loop spectrum strictly inside the unit disc.</p><p>This (DARE) is also the equation that arises from the <a href="https://julia.quantecon.org/dynamic_programming/lqcontrol.html">QuantEcon LQ Dynamic Programming</a> problem (with cost-matrix labels swapped: that lecture writes the state cost as <span>$R$</span> and the control cost as <span>$Q$</span>; here, following <code>MatrixEquations.jl</code>, <span>$Q$</span> is the state cost and <span>$R$</span> is the control cost).</p><h2 id="Example:-stationary-Kalman-filter-via-DARE-duality"><a class="docs-heading-anchor" href="#Example:-stationary-Kalman-filter-via-DARE-duality">Example: stationary Kalman filter via DARE duality</a><a id="Example:-stationary-Kalman-filter-via-DARE-duality-1"></a><a class="docs-heading-anchor-permalink" href="#Example:-stationary-Kalman-filter-via-DARE-duality" title="Permalink"></a></h2><p>The discrete-time linear filtering problem (Muth 1960; Ljungqvist &amp; Sargent, <em>Recursive Macroeconomic Theory</em>, ch. on optimal linear filtering; QuantEcon Julia lectures on <a href="https://julia.quantecon.org/introduction_dynamics/linear_models.html">Linear State Space Models</a> and <a href="https://julia.quantecon.org/introduction_dynamics/kalman.html">Kalman Filter</a>) is</p><p class="math-container">\[x_{t+1} \;=\; A\,x_t \;+\; w_{t+1},
+\qquad
+y_t \;=\; G\,x_t \;+\; v_t,
+\qquad
+w_t \sim \mathcal{N}(0,\,Q),
+\quad
+v_t \sim \mathcal{N}(0,\,R),\]</p><p>with <span>$\{w_t\}$</span> and <span>$\{v_t\}$</span> mutually independent IID sequences. <span>$A$</span> is the <span>$n \times n$</span> state transition, <span>$G$</span> is the <span>$k \times n$</span> output matrix, <span>$Q$</span> is the <span>$n \times n$</span> process-noise covariance, and <span>$R$</span> is the <span>$k \times k$</span> measurement-noise covariance — exactly the QuantEcon convention. The stationary one-step-ahead error covariance</p><p class="math-container">\[P \;=\; \lim_{t \to \infty} \mathbb{E}\bigl[(x_t - \hat x_{t|t-1})(x_t - \hat x_{t|t-1})^\top\bigr]\]</p><p>satisfies the <em>filter</em> DARE</p><p class="math-container">\[P \;=\; A\,P\,A^\top \;-\; A\,P\,G^\top\,(G\,P\,G^\top + R)^{-1}\,G\,P\,A^\top \;+\; Q,
+\tag{FDARE}\]</p><p>with stationary Kalman gain</p><p class="math-container">\[K \;=\; A\,P\,G^\top\,(G\,P\,G^\top + R)^{-1}.\]</p><p>By the LQR ↔ Kalman duality, (FDARE) is the control (DARE) under</p><p class="math-container">\[(A_{\text{ctrl}}, B_{\text{ctrl}}, R_{\text{ctrl}}, Q_{\text{ctrl}})
+= (A^\top, G^\top, R, Q).\]</p><p>Calling <code>ared(A_filter&#39;, G_filter&#39;, R, Q)</code> therefore returns <span>$X = P$</span> (stationary filter covariance) and <span>$F = K^\top$</span>. Both AD rules carry over verbatim.</p><h3 id="Scalar-signal-extraction-example"><a class="docs-heading-anchor" href="#Scalar-signal-extraction-example">Scalar signal-extraction example</a><a id="Scalar-signal-extraction-example-1"></a><a class="docs-heading-anchor-permalink" href="#Scalar-signal-extraction-example" title="Permalink"></a></h3><p>Take the canonical scalar AR(1) signal observed with noise — the <span>$n = 1$</span>, <span>$k = 1$</span> specialisation with <span>$A = \rho$</span>, <span>$G = 1$</span>, <span>$Q = \sigma_w^2$</span>, <span>$R = \sigma_v^2$</span>:</p><p class="math-container">\[x_{t+1} \;=\; \rho\,x_t \;+\; w_{t+1},
+\qquad
+y_t \;=\; x_t \;+\; v_t.\]</p><p>In closed form <span>$P$</span> is the positive root of</p><p class="math-container">\[P^2 \;+\; P\bigl[\sigma_v^2(1 - \rho^2) - \sigma_w^2\bigr] \;-\; \sigma_w^2\,\sigma_v^2 \;=\; 0,
+\qquad
+K \;=\; \frac{\rho\,P}{P + \sigma_v^2}.\]</p><p><code>ared</code> reproduces both:</p><pre><code class="language-julia-repl hljs">julia&gt; using MatrixEquations: ared
+
+julia&gt; ρ, σ_w, σ_v = 0.9, 0.5, 1.0;
+
+julia&gt; A = reshape([ρ], 1, 1); G = reshape([1.0], 1, 1);
+
+julia&gt; R = reshape([σ_v^2], 1, 1); Q = reshape([σ_w^2], 1, 1);
+
+julia&gt; X, _, F = ared(A&#39;, G&#39;, R, Q);
+
+julia&gt; P = X[1, 1];
+
+julia&gt; K = F[1, 1];                       # equals ρ·P/(P + σ_v²)
+
+julia&gt; s = σ_w^2 - σ_v^2 * (1 - ρ^2);
+
+julia&gt; P_closed = (s + sqrt(s^2 + 4 * σ_w^2 * σ_v^2)) / 2;
+
+julia&gt; isapprox(P, P_closed; atol = 1.0e-12)
+true
+
+julia&gt; isapprox(K, ρ * P / (P + σ_v^2); atol = 1.0e-12)
+true</code></pre><h3 id="Differentiating-the-Kalman-gain"><a class="docs-heading-anchor" href="#Differentiating-the-Kalman-gain">Differentiating the Kalman gain</a><a id="Differentiating-the-Kalman-gain-1"></a><a class="docs-heading-anchor-permalink" href="#Differentiating-the-Kalman-gain" title="Permalink"></a></h3><p>The same closure differentiates end-to-end through <code>ared</code>. Build the four matrices via <code>eltype(θ)</code> so ForwardDiff <code>Dual</code> partials flow into every input:</p><pre><code class="language-julia hljs">using ForwardDiff
+using MatrixEquations: ared
+using MatrixEquationsAD
+
+function kalman_gain(θ)
+    ρ, σ_w, σ_v = θ
+    T = eltype(θ)
+    A = reshape(T[ρ],     1, 1)
+    G = reshape(T[1.0],   1, 1)
+    R = reshape(T[σ_v^2], 1, 1)
+    Q = reshape(T[σ_w^2], 1, 1)
+    _, _, F = ared(A, G, R, Q)        # uses A_ctrl = A_filter^⊤ = ρ (scalar)
+    return F[1, 1]
+end
+
+θ₀ = [0.9, 0.5, 1.0]                  # (ρ, σ_w, σ_v)
+K  = kalman_gain(θ₀)
+∇K = ForwardDiff.gradient(kalman_gain, θ₀)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+  0.7131031654751965
+  0.5868344342552804
+ -0.29341721712763996</code></pre><p>The three components <span>$\partial K/\partial \rho$</span>, <span>$\partial K/\partial \sigma_w$</span>, <span>$\partial K/\partial \sigma_v$</span> match the economic intuition:</p><pre><code class="language-julia hljs">∇K</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">3-element Vector{Float64}:
+  0.7131031654751965
+  0.5868344342552804
+ -0.29341721712763996</code></pre><p><code>∂K/∂ρ &gt; 0</code> (more persistence → trust the model more); <code>∂K/∂σ_w &gt; 0</code> (larger process noise → trust the data more); <code>∂K/∂σ_v &lt; 0</code> (noisier observations → trust the data less).</p><p>Sweeping <span>$\rho$</span> over <span>$[0.5, 0.99]$</span> at fixed <span>$\sigma_w, \sigma_v$</span> and overlaying the tangent <span>$K(\rho_0) + (\partial K / \partial \rho)(\rho - \rho_0)$</span>:</p><pre><code class="language-julia hljs">using Plots
+
+ρ_range = range(0.5, 0.99, length = 50)
+K_curve = map(ρ_range) do ρ
+    kalman_gain([ρ, θ₀[2], θ₀[3]])
+end
+tangent = K .+ ∇K[1] .* (ρ_range .- θ₀[1])
+
+plot(ρ_range, K_curve;
+    label = &quot;K(ρ)&quot;, xlabel = &quot;ρ&quot;, ylabel = &quot;Kalman gain K&quot;,
+    legend = :bottomright, linewidth = 2)
+plot!(ρ_range, tangent;
+    label = &quot;tangent at ρ₀ = $(θ₀[1])&quot;, linestyle = :dash)
+scatter!([θ₀[1]], [K]; label = &quot;baseline&quot;, markersize = 5)</code></pre><img src="08fbabd3.svg" alt="Example block output"/><h3 id="Non-invertible-observation:-Muth-permanent/transitory-decomposition"><a class="docs-heading-anchor" href="#Non-invertible-observation:-Muth-permanent/transitory-decomposition">Non-invertible observation: Muth permanent/transitory decomposition</a><a id="Non-invertible-observation:-Muth-permanent/transitory-decomposition-1"></a><a class="docs-heading-anchor-permalink" href="#Non-invertible-observation:-Muth-permanent/transitory-decomposition" title="Permalink"></a></h3><p>The scalar case has an invertible observation map (<span>$G = 1$</span>). The Muth permanent/transitory decomposition (Muth 1960; Ljungqvist &amp; Sargent, optimal-linear-filtering chapter) is the canonical case where the observation pools several latent components and the filter must use the <em>dynamics</em> to disentangle them: the state <span>$x_t = [\mu_t,\,\varepsilon_t]^\top$</span> decomposes a signal into a <em>permanent</em> random-walk component and a <em>transitory</em> AR(1) component,</p><p class="math-container">\[\mu_{t+1} \;=\; \mu_t \;+\; \nu_{t+1},
+\qquad
+\varepsilon_{t+1} \;=\; \rho\,\varepsilon_t \;+\; \omega_{t+1},
+\qquad
+\nu_t \sim \mathcal{N}(0, \sigma_\nu^2),
+\quad
+\omega_t \sim \mathcal{N}(0, \sigma_\omega^2),\]</p><p>and only the <em>sum</em> plus measurement noise is observed,</p><p class="math-container">\[y_t \;=\; \mu_t \;+\; \varepsilon_t \;+\; v_t,
+\qquad
+v_t \sim \mathcal{N}(0, \sigma_v^2).\]</p><p>In the same state-space form <span>$x_{t+1} = A\,x_t + w_{t+1}$</span>, <span>$y_t = G\,x_t + v_t$</span> with <span>$x_t = [\mu_t;\,\varepsilon_t]$</span>,</p><p class="math-container">\[A \;=\;
+\begin{bmatrix}
+1 &amp; 0 \\
+0 &amp; \rho
+\end{bmatrix},
+\qquad
+G \;=\;
+\begin{bmatrix}
+1 &amp; 1
+\end{bmatrix},
+\qquad
+Q \;=\;
+\begin{bmatrix}
+\sigma_\nu^2 &amp; 0 \\
+0 &amp; \sigma_\omega^2
+\end{bmatrix},
+\qquad
+R \;=\;
+\bigl[\sigma_v^2\bigr].\]</p><p><span>$G$</span> is <span>$1 \times 2$</span> and <strong>not invertible</strong> — its null space is spanned by <span>$[1, -1]^\top$</span>, the cross-sectional indeterminacy between <span>$\mu$</span> and <span>$\varepsilon$</span> at a single date. The filter still identifies both components in the limit because they have <em>different dynamics</em>: permanent shocks live forever, transitory shocks decay at rate <span>$\rho$</span>. The Kalman gain <span>$K \in \mathbb{R}^{2 \times 1}$</span> encodes how a unit observation surprise is split between updating <span>$\hat\mu$</span> and <span>$\hat\varepsilon$</span>.</p><pre><code class="language-julia hljs">using ForwardDiff
+using MatrixEquations: ared
+using MatrixEquationsAD
+
+function muth_filter(ρ, σ_ν, σ_ω, σ_v)
+    T = promote_type(typeof(ρ), typeof(σ_ν), typeof(σ_ω), typeof(σ_v))
+    A = T[1.0    0.0;
+          0.0    ρ]              # filter state transition
+    G = T[1.0    1.0]             # observation map
+    Q = T[σ_ν^2  0.0;
+          0.0    σ_ω^2]           # process-noise covariance
+    R = reshape(T[σ_v^2], 1, 1)   # measurement-noise covariance
+    # LQR ↔ Kalman duality requires (A_ctrl, B_ctrl) = (Aᵀ, Gᵀ);
+    # materialise the transposes so the StridedMatrix AD dispatch fires.
+    X, _, F = ared(permutedims(A), permutedims(G), R, Q)
+    return X, permutedims(F)      # X = P (2×2), K = Fᵀ (2×1)
+end
+
+# Baseline parameters: small permanent shock, larger transitory shock,
+# unit measurement noise. ρ = 0.7 says transitory shocks decay with
+# half-life ≈ 2 periods.
+σ_ν, σ_ω, σ_v = 0.05, 0.5, 1.0
+ρ_baseline   = 0.7
+P, K = muth_filter(ρ_baseline, σ_ν, σ_ω, σ_v)
+P, K</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">([0.09533349966553528 -0.035658122107798396; -0.035658122107798396 0.4004430192134004], [0.04189332522582327; 0.17926047676848803;;])</code></pre><p>The first column of <code>K</code> is the gain on the <em>permanent</em> component <span>$\hat\mu_{t|t}$</span>; the second is the gain on the <em>transitory</em> component <span>$\hat\varepsilon_{t|t}$</span>. Their ratio is informative: when <span>$K_\mu / K_\varepsilon$</span> is large the filter attributes new information mostly to a shift in the permanent component, and when it is small the filter attributes it mostly to a transient blip.</p><p>Sweep <span>$\rho$</span> over <span>$[0,\, 0.99]$</span> and plot both gain components:</p><pre><code class="language-julia hljs">using Plots
+
+ρ_grid = range(0.0, 0.99, length = 60)
+gains  = [muth_filter(ρ, σ_ν, σ_ω, σ_v)[2] for ρ in ρ_grid]
+K_μ = [g[1] for g in gains]
+K_ε = [g[2] for g in gains]
+
+plot(ρ_grid, K_μ;
+    label = &quot;K_μ (permanent)&quot;, xlabel = &quot;ρ (transitory AR(1) coefficient)&quot;,
+    ylabel = &quot;Kalman gain component&quot;, legend = :left, linewidth = 2)
+plot!(ρ_grid, K_ε; label = &quot;K_ε (transitory)&quot;, linewidth = 2)
+vline!([ρ_baseline]; label = &quot;baseline ρ = $(ρ_baseline)&quot;, linestyle = :dot)</code></pre><img src="668d6e63.svg" alt="Example block output"/><p>Two limits explain the shape:</p><ul><li><strong><span>$\rho \to 0$</span></strong> — <span>$\varepsilon_t$</span> is white noise, indistinguishable from measurement noise except by its variance. Nothing to predict in the transitory component, so <span>$K_\varepsilon \to 0$</span> and almost all updating goes into <span>$\hat\mu$</span>.</li><li><strong><span>$\rho \to 1$</span></strong> — the two state components have identical dynamics. The filter cannot tell them apart from the observation, so it splits the gain in proportion to innovation variances (here <span>$\sigma_\omega^2 \gg \sigma_\nu^2$</span>, so <span>$K_\varepsilon$</span> dominates).</li></ul><p>ForwardDiff returns the sensitivity of any scalar summary directly. For example, the gain ratio <span>$K_\mu / K_\varepsilon$</span> quantifies how permanent the filter believes the observed surprise is:</p><pre><code class="language-julia hljs">function gain_ratio(θ)
+    ρ, σ_ν, σ_ω, σ_v = θ
+    _, K = muth_filter(ρ, σ_ν, σ_ω, σ_v)
+    return K[1] / K[2]
+end
+
+θ₀ = [ρ_baseline, σ_ν, σ_ω, σ_v]
+∇r = ForwardDiff.gradient(gain_ratio, θ₀)</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">4-element Vector{Float64}:
+ -0.5816153402127244
+  5.002659304359619
+ -0.7218208271662547
+  0.11077744836514111</code></pre><p>The signs:</p><ul><li><span>$\partial(K_\mu/K_\varepsilon)/\partial \rho &lt; 0$</span> — more persistence in the transitory component attributes more of a surprise to <span>$\hat\varepsilon$</span>.</li><li><span>$\partial(K_\mu/K_\varepsilon)/\partial \sigma_\nu &gt; 0$</span> — larger permanent-shock variance pushes toward permanent updating.</li><li><span>$\partial(K_\mu/K_\varepsilon)/\partial \sigma_\omega &lt; 0$</span> — larger transitory-shock variance pushes the other way.</li><li><span>$\partial(K_\mu/K_\varepsilon)/\partial \sigma_v$</span> is small — once the surprise has been split, measurement noise scales both components.</li></ul><pre><code class="language-julia hljs">(ρ = ∇r[1], σ_ν = ∇r[2], σ_ω = ∇r[3], σ_v = ∇r[4])</code></pre><pre class="documenter-example-output"><code class="nohighlight hljs ansi">(ρ = -0.5816153402127244, σ_ν = 5.002659304359619, σ_ω = -0.7218208271662547, σ_v = 0.11077744836514111)</code></pre><h2 id="Differentials-and-AD-rules"><a class="docs-heading-anchor" href="#Differentials-and-AD-rules">Differentials and AD rules</a><a id="Differentials-and-AD-rules-1"></a><a class="docs-heading-anchor-permalink" href="#Differentials-and-AD-rules" title="Permalink"></a></h2><p>Let</p><p class="math-container">\[G \;=\; R + B^\top X B,
+\qquad
+F \;=\; G^{-1}(B^\top X A + S^\top),
+\qquad
+A_c \;=\; A - B\,F.\]</p><p>Throughout, <span>$P_n(\cdot) = \tfrac{1}{2}(\cdot + \cdot^\top)$</span> denotes symmetrisation of an <span>$n \times n$</span> matrix; <span>$P_m$</span> is the analogous symmetriser on <span>$m \times m$</span> matrices.</p><h3 id="JVP"><a class="docs-heading-anchor" href="#JVP">JVP</a><a id="JVP-1"></a><a class="docs-heading-anchor-permalink" href="#JVP" title="Permalink"></a></h3><p><strong>Step 1: differentiate the implicit equation.</strong> Differentiating (DARE) and using</p><p class="math-container">\[\Delta G = \Delta R + \Delta B^\top X B + B^\top \Delta X B + B^\top X \Delta B,
+\qquad
+\Delta M = \Delta B^\top X A + B^\top \Delta X A + B^\top X \Delta A + \Delta S^\top,\]</p><p>gives a discrete Lyapunov equation for <span>$\Delta X$</span> against the closed-loop <span>$A_c$</span>:</p><p class="math-container">\[\Delta X \;-\; A_c^\top\,\Delta X\,A_c \;=\; P_n(H),\]</p><p>with</p><p class="math-container">\[\begin{aligned}
+H \;=\;
+&amp;\;\Delta Q
+\;+\; \Delta A^\top X A_c
+\;+\; A_c^\top X \Delta A \\
+&amp;-\; A_c^\top X \Delta B\,F
+\;-\; F^\top \Delta B^\top X A_c
+\;+\; F^\top \Delta R\,F \\
+&amp;-\; \Delta S\,F
+\;-\; F^\top \Delta S^\top.
+\end{aligned}\]</p><p>For symmetric perturbations of <span>$Q$</span> and <span>$R$</span> and arbitrary cross-term perturbations of <span>$S$</span>, <span>$P_n$</span> is a no-op on the symmetric pieces and only matters in the asymmetric components.</p><p><strong>Step 2: cached factorisations.</strong> Two caches built on the value layer:</p><ol><li>Schur factorisation of the closed loop <span>$A_c = Z S Z^\top$</span>, used for the discrete Lyapunov solve.</li><li>Cholesky (or LU) factorisation of <span>$G = R + B^\top X B$</span>, used for both the <span>$\Delta F$</span> formula below and the reverse pass.</li></ol><p><strong>Step 3: solve per direction.</strong> One triangular Lyapunov sweep against the cached Schur factors gives <span>$\Delta X$</span>. The gain tangent is then</p><p class="math-container">\[\Delta F \;=\; G^{-1}\bigl(\Delta M - \Delta G\,F\bigr).\]</p><p>ForwardDiff chunks of width <span>$N$</span> and Enzyme <code>BatchDuplicated</code> of width <span>$N$</span> reuse both caches: per lane, one Lyapunov sweep plus one <span>$G^{-1}$</span> solve.</p><p><strong>Step 4: code path.</strong> <code>ext/riccati_derivatives.jl</code> builds the plan (caches) once; <code>ext/forwarddiff_riccati.jl</code> and <code>ext/enzyme_riccati.jl</code> dispatch per tangent.</p><h3 id="VJP"><a class="docs-heading-anchor" href="#VJP">VJP</a><a id="VJP-1"></a><a class="docs-heading-anchor-permalink" href="#VJP" title="Permalink"></a></h3><p>The reverse pass accepts cotangents for both differentiated outputs: <span>$\bar X$</span> and <span>$\bar F$</span>.</p><p><strong>Step 1: differentiate (adjoint).</strong> Propagate through <span>$F$</span> first:</p><p class="math-container">\[\Lambda \;=\; G^{-\top}\,\bar F,
+\qquad
+\Theta \;=\; P_m\bigl(-\Lambda\,F^\top\bigr).\]</p><p>The cotangent passed to the closed-loop Lyapunov adjoint is</p><p class="math-container">\[\bar X_{\text{total}}
+\;=\;
+P_n\bigl(\bar X + B\,\Lambda\,A^\top + B\,\Theta\,B^\top\bigr).\]</p><p>Let <span>$Y$</span> solve the adjoint of the tangent Lyapunov operator,</p><p class="math-container">\[Y - A_c\,Y\,A_c^\top \;=\; \bar X_{\text{total}}.\]</p><p><strong>Step 2: cached factorisations.</strong> Same closed-loop Schur and <span>$G$</span> factorisation as the JVP, stashed on Enzyme&#39;s tape; multiple reverse cotangents (e.g. simultaneous <span>$\bar X$</span> and <span>$\bar F$</span>) share one factorisation pair.</p><p><strong>Step 3: parameter cotangents.</strong> The direct <span>$\bar F$</span>-contributions are</p><p class="math-container">\[\begin{aligned}
+\bar A &amp;\mathrel{+}= X^\top\,B\,\Lambda, \\
+\bar B &amp;\mathrel{+}= X\,A\,\Lambda^\top
+        \;+\; X\,B\,\Theta^\top
+        \;+\; X^\top\,B\,\Theta, \\
+\bar R &amp;\mathrel{+}= \Theta, \\
+\bar S &amp;\mathrel{+}= \Lambda^\top.
+\end{aligned}\]</p><p>After the adjoint Lyapunov solve produces <span>$Y$</span>, add the remaining adjoints:</p><p class="math-container">\[\begin{aligned}
+\bar Q &amp;\mathrel{+}= Y, \\
+\bar A &amp;\mathrel{+}= X\,A_c\,Y^\top + X^\top\,A_c\,Y, \\
+\bar B &amp;\mathrel{-}= X^\top\,A_c\,Y\,F^\top + X\,A_c\,Y^\top\,F^\top, \\
+\bar R &amp;\mathrel{+}= F\,Y\,F^\top, \\
+\bar S &amp;\mathrel{-}= Y\,F^\top + Y^\top\,F^\top.
+\end{aligned}\]</p><p><strong>Step 4: code path.</strong> Only <span>$X$</span> and <span>$F$</span> are differentiated; the <code>evals</code>, <code>Z</code>, and <code>scalinfo</code> return values are returned with zero shadows. The default four-argument <code>ared(A, B, R, Q)</code> method is handled by setting <span>$S = 0$</span> before dispatching to the five-argument rule.</p><p>References:</p><ul><li>MatrixEquations.jl documents <code>ared</code>, the stabilising gain <span>$F$</span>, and (DARE) in its <a href="https://andreasvarga.github.io/MatrixEquations.jl/dev/riccati.html">Riccati solver documentation</a>.</li><li>Arnold and Laub&#39;s generalised-eigenproblem method: <a href="https://doi.org/10.1109/PROC.1984.13083">DOI:10.1109/PROC.1984.13083</a>.</li><li>Kao, T.-T. and Hennequin, M. (2020). <em>Automatic differentiation of Sylvester, Lyapunov, and algebraic Riccati equations.</em> <a href="https://arxiv.org/abs/2011.11430">arXiv:2011.11430</a>. The general IFT recipe used here; Kao–Hennequin develop it for the <em>continuous</em> algebraic Riccati equation, while the discrete-time formulas in this section are derived against the closed-loop Lyapunov operator <span>$L_{A_c}[\cdot]$</span>.</li><li>Muth, J. F. (1960). <em>Optimal properties of exponentially weighted forecasts.</em> JASA <a href="https://doi.org/10.1080/01621459.1960.10483352">DOI:10.1080/01621459.1960.10483352</a>. Original scalar signal-extraction problem solved by the Kalman filter.</li><li>Ljungqvist, L. and Sargent, T. J. <em>Recursive Macroeconomic Theory</em> (4th ed., MIT Press, 2018). The optimal-linear-filtering chapter develops the DARE-via-duality machinery and applies it to the permanent-income, signal-extraction, and innovations-representation examples cited above.</li><li>Anderson, B. D. O. and Moore, J. B. <em>Optimal Filtering</em> (Prentice-Hall, 1979, repr. Dover 2005). Standard reference for the LQR ↔ Kalman duality <span>$(A_{\text{ctrl}}, B_{\text{ctrl}}, R_{\text{ctrl}}, Q_{\text{ctrl}}) = (A_{\text{filt}}^\top, G_{\text{filt}}^\top, R, CC^\top)$</span>.</li><li>QuantEcon Julia lectures — <a href="https://julia.quantecon.org/introduction_dynamics/linear_models.html">Linear State Space Models</a>, <a href="https://julia.quantecon.org/introduction_dynamics/kalman.html">Kalman Filter</a>, and <a href="https://julia.quantecon.org/dynamic_programming/lqcontrol.html">LQ Dynamic Programming</a>. The <span>$(A, G, Q, R)$</span> notation used in this section follows those lectures.</li></ul></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../sylvester/">« Generalised Sylvester</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.17.0 on <span class="colophon-date" title="Monday 25 May 2026 11:08">Monday 25 May 2026</span>. Using Julia version 1.12.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
