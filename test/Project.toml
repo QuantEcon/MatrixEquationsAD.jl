@@ -10,3 +10,6 @@ MatrixEquationsAD = "283a1a7b-c18a-432b-b100-bdc256e73a32"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[compat]
+Enzyme = "0.13.149"
