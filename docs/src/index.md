@@ -27,6 +27,11 @@ using MatrixEquationsAD  # AD rules loaded on extension load
   projection of the output.
 - [Generalised Sylvester](sylvester.md) — `gsylv(A, B, C, D, E)` and the
   Kronecker variant `gsylvkr` solving ``A X B + C X D = E``.
+- [Order-2 Kronecker Sylvester (Kamenik)](sylvester_kamenik.md) —
+  `gsylv_kamenik(A, B, C, D)` and in-place `gsylv_kamenik!` solving
+  ``A X + B X (C \otimes C) = D``, the second-order DSGE-perturbation
+  form. Enzyme forward (incl. `BatchDuplicated`) + reverse
+  (Width = 1), both allocating and in-place.
 - [Algebraic Riccati (DARE)](ared.md) — `ared(A, B, R, Q, S)` solving
   the discrete algebraic Riccati equation and returning the stabilising
   gain `F` alongside `X`.

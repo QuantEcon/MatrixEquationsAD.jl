@@ -22,6 +22,7 @@ makedocs(;
         "Discrete Lyapunov (Schur)" => "lyapd.md",
         "Kronecker Discrete Lyapunov" => "lyapdkr.md",
         "Generalised Sylvester" => "sylvester.md",
+        "Order-2 Kronecker Sylvester (Kamenik)" => "sylvester_kamenik.md",
         "Algebraic Riccati (DARE)" => "ared.md",
     ],
 )

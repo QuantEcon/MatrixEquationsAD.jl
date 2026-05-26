@@ -21,6 +21,10 @@ for derivations, worked examples, and the per-solver API:
   `lyapdkr(A, C)` Kronecker LU variant
 - [Generalised Sylvester](https://QuantEcon.github.io/MatrixEquationsAD.jl/dev/sylvester/) —
   `gsylv` / `gsylvkr` for ``A X B + C X D = E``
+- [Order-2 Kronecker Sylvester (Kamenik)](https://QuantEcon.github.io/MatrixEquationsAD.jl/dev/sylvester_kamenik/) —
+  `gsylv_kamenik` / `gsylv_kamenik!` for ``A X + B X (C ⊗ C) = D``
+  (DSGE second-order perturbation form; Enzyme forward incl.
+  `BatchDuplicated` + reverse Width = 1, both allocating and in-place)
 - [Algebraic Riccati (DARE)](https://QuantEcon.github.io/MatrixEquationsAD.jl/dev/ared/) —
   `ared(A, B, R, Q, S)` with stabilising gain `F`
 

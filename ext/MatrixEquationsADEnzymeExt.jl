@@ -7,8 +7,8 @@ import Enzyme.EnzymeRules
 import MatrixEquations: ared, gsylv, gsylvkr, lyapd
 import MatrixEquationsAD:
     LyapDSchurCache, build_M!!, symmetrize!!,
-    klein_map, klein_map!, lyapd!, lyapdadjointsolve, lyapdfactor, lyapdkr, lyapdkr!,
-    lyapdsolve
+    gsylv_kamenik, gsylv_kamenik!, klein_map, klein_map!, lyapd!, lyapdadjointsolve,
+    lyapdfactor, lyapdkr, lyapdkr!, lyapdsolve
 using ConcreteStructs: @concrete
 using Enzyme:
     Annotation, BatchDuplicated, BatchDuplicatedNoNeed, Const,
@@ -18,6 +18,7 @@ using LinearAlgebra:
     ldiv!, lu, lu!, mul!, schur, transpose!
 
 include("enzyme_sylvester.jl")
+include("enzyme_sylvester_kamenik.jl")
 include("enzyme_lyapunov.jl")
 include("enzyme_lyapdkr.jl")
 include("riccati_derivatives.jl")
