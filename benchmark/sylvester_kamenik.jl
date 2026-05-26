@@ -1,5 +1,7 @@
 using BenchmarkTools
-using Enzyme: Active, Const, Duplicated, Enzyme, Reverse, make_zero
+using Enzyme:
+    Active, BatchDuplicated, Const, Duplicated, Enzyme, Forward, Reverse,
+    make_zero
 using LinearAlgebra: dot
 using MatrixEquationsAD: gsylv_kamenik, gsylv_kamenik!
 
@@ -10,6 +12,8 @@ using .SylvesterKamenikFixtures:
     rbc_sv_second_order_sylvester_inputs,
     sgu_second_order_sylvester_inputs,
     fvgq_second_order_sylvester_inputs
+
+const BATCH_WIDTH = 4
 
 function gsylv_kamenik_problem(builder)
     fix = builder()
@@ -51,6 +55,27 @@ function gsylv_kamenik_group(problem)
         W = $(problem.W)
     end evals = 4
 
+    # Forward (JVP) with `BatchDuplicated(BATCH_WIDTH)`. The Kamenik
+    # factorisation is amortised across the primal + all `BATCH_WIDTH`
+    # tangent solves, so the per-direction cost should run well below
+    # one full primal.
+    g["enzyme_forward"] = @benchmarkable Enzyme.autodiff(
+        Forward, gsylv_kamenik, BatchDuplicated,
+        BatchDuplicated(A, dAs),
+        BatchDuplicated(B, dBs),
+        BatchDuplicated(C, dCs),
+        BatchDuplicated(D, dDs),
+    ) setup = begin
+        A = copy($(problem.A))
+        B = copy($(problem.B))
+        C = copy($(problem.C))
+        D = copy($(problem.D))
+        dAs = ntuple(_ -> make_zero(A), Val($BATCH_WIDTH))
+        dBs = ntuple(_ -> make_zero(B), Val($BATCH_WIDTH))
+        dCs = ntuple(_ -> make_zero(C), Val($BATCH_WIDTH))
+        dDs = ntuple(_ -> make_zero(D), Val($BATCH_WIDTH))
+    end evals = 4
+
     return g
 end
 
@@ -90,16 +115,33 @@ function gsylv_kamenik_inplace_group(problem)
         W = $(problem.W)
     end evals = 4
 
+    g["enzyme_forward!"] = @benchmarkable Enzyme.autodiff(
+        Forward, gsylv_kamenik!, Const,
+        BatchDuplicated(D, dDs),
+        BatchDuplicated(A, dAs),
+        BatchDuplicated(B, dBs),
+        BatchDuplicated(C, dCs),
+    ) setup = begin
+        A = copy($(problem.A))
+        B = copy($(problem.B))
+        C = copy($(problem.C))
+        D = copy($(problem.D))
+        dAs = ntuple(_ -> make_zero(A), Val($BATCH_WIDTH))
+        dBs = ntuple(_ -> make_zero(B), Val($BATCH_WIDTH))
+        dCs = ntuple(_ -> make_zero(C), Val($BATCH_WIDTH))
+        dDs = ntuple(_ -> make_zero(D), Val($BATCH_WIDTH))
+    end evals = 4
+
     return g
 end
 
 KAMENIK_SUITE = BenchmarkGroup()
 KAMENIK_SUITE["gsylv_kamenik"] = BenchmarkGroup()
 for (model, builder) in (
-        ("rbc",    rbc_second_order_sylvester_inputs),
+        ("rbc", rbc_second_order_sylvester_inputs),
         ("rbc_sv", rbc_sv_second_order_sylvester_inputs),
-        ("sgu",    sgu_second_order_sylvester_inputs),
-        ("fvgq",   fvgq_second_order_sylvester_inputs),
+        ("sgu", sgu_second_order_sylvester_inputs),
+        ("fvgq", fvgq_second_order_sylvester_inputs),
     )
     prob = gsylv_kamenik_problem(builder)
     g = gsylv_kamenik_group(prob)

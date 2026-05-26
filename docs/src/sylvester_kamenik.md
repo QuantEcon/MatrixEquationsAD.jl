@@ -14,11 +14,13 @@ saddle-path steady state (Schmitt-Grohé and Uribe, 2004; Andreasen,
 Fernández-Villaverde, Rubio-Ramírez, 2018), where ``C`` is the
 first-order state transition matrix (``h_x``).
 
-**Scope:** this page documents `MatrixEquationsAD.gsylv_kamenik`,
-which is **order = 2 only** (one Kronecker factor squared) and ships
-with an **Enzyme reverse rule only**. There is no ForwardDiff `Dual`
-dispatch, no Enzyme forward rule, no batched (`BatchDuplicated`)
-support, and no `order > 2` implementation.
+**Scope:** this page documents the allocating
+`MatrixEquationsAD.gsylv_kamenik` and the in-place
+`MatrixEquationsAD.gsylv_kamenik!`. Both forms ship with an Enzyme
+forward rule (Width = 1 and `BatchDuplicated`) and an Enzyme reverse
+rule (Width = 1). Both are **order = 2 only** (one Kronecker factor
+squared). There is no ForwardDiff `Dual` dispatch and no `order > 2`
+implementation.
 
 The algorithm is a compact rewrite of Kamenik (2005), departing from
 the
@@ -32,8 +34,13 @@ the original port carries.
 Implementation pointers:
 
 - `src/sylvester_kamenik.jl` — primal solver (allocating
-  `gsylv_kamenik` and in-place `gsylv_kamenik!`).
-- `ext/enzyme_sylvester_kamenik.jl` — Enzyme reverse rule (Width = 1).
+  `gsylv_kamenik`, in-place `gsylv_kamenik!`, and a private
+  `_gsylv_kamenik_factor` / `_gsylv_kamenik_solve!` split that lets the
+  Enzyme forward rule amortise one factorisation across the primal +
+  every tangent solve).
+- `ext/enzyme_sylvester_kamenik.jl` — Enzyme forward (Width 1 and
+  `BatchDuplicated`) and Enzyme reverse (Width = 1) rules for both
+  forms.
 
 ## Primal algorithm
 
@@ -107,14 +114,80 @@ X = gsylv_kamenik(A, B, C, D)
 norm(A * X + B * X * kron(C, C) - D) / norm(D)  # ≈ 1e-15
 ```
 
-## Enzyme VJP
+## Enzyme JVP (forward)
+
+Differentiating (KS) gives, for tangent inputs
+``(\mathrm{d}A, \mathrm{d}B, \mathrm{d}C, \mathrm{d}D)``,
+
+```math
+A\,\mathrm{d}X \;+\; B\,\mathrm{d}X\,K
+\;=\; \mathrm{d}D
+ \;-\; \mathrm{d}A\,X
+ \;-\; \mathrm{d}B\,(X\,K)
+ \;-\; B\,X\,(\mathrm{d}C \otimes C + C \otimes \mathrm{d}C),
+```
+
+via the Kronecker product rule
+``\mathrm{d}(C \otimes C) = (\mathrm{d}C \otimes C) + (C \otimes \mathrm{d}C)``.
+The JVP equation in ``\mathrm{d}X`` has the **same** coefficient triple
+``(A, B, C)`` as the primal — it is again a Kamenik order-2 system, so
+the Enzyme forward rule reuses the primal factorisation across all
+tangent solves. The terms ``B\,X\,(\mathrm{d}C \otimes C)`` and
+``B\,X\,(C \otimes \mathrm{d}C)`` are computed via the two-pass GEMM
+trick used by the primal — no ``m^2 \times m^2`` Kronecker is ever
+formed. Pre-computed ``B\,X`` and ``X\,K`` are reused across tangents.
+
+**Worked example — `BatchDuplicated(4)`** computes four tangent
+directions in one Enzyme call, amortising the factorisation:
+
+```julia
+using Enzyme: BatchDuplicated, Forward, autodiff
+using MatrixEquationsAD: gsylv_kamenik
+
+# (A, B, C, D) from the example above.
+A = [4.0  0.1  0.0  0.0; -0.2  3.6  0.3  0.1;  0.1  0.0  3.8  0.0;  0.0 -0.1  0.0  3.4]
+B = 0.1 .* Matrix(1.0I, 4, 4)
+C = [0.5  0.1 -0.05;  0.0  0.6  0.1; -0.05  0.0  0.4]
+D = reshape(collect(1.0:36.0), 4, 9)
+
+dAs = ntuple(_ -> randn(size(A)...), Val(4))
+dBs = ntuple(_ -> randn(size(B)...), Val(4))
+dCs = ntuple(_ -> randn(size(C)...), Val(4))
+dDs = ntuple(_ -> randn(size(D)...), Val(4))
+
+dXs = autodiff(
+    Forward, gsylv_kamenik, BatchDuplicated,
+    BatchDuplicated(A, dAs), BatchDuplicated(B, dBs),
+    BatchDuplicated(C, dCs), BatchDuplicated(D, dDs),
+)[1]
+# `dXs[k]` is the JVP in the k-th direction.
+```
+
+The in-place form `gsylv_kamenik!` exposes the same forward rule. The
+input buffer (`D`) is overwritten with the primal solution, and each
+shadow slot in `D.dval` is overwritten with the corresponding tangent
+solution:
+
+```julia
+Dwork = copy(D)
+dD_io = map(copy, dDs)
+autodiff(
+    Forward, gsylv_kamenik!, Enzyme.Const,
+    BatchDuplicated(Dwork, dD_io),
+    BatchDuplicated(A, dAs), BatchDuplicated(B, dBs),
+    BatchDuplicated(C, dCs),
+)
+# `Dwork` now holds X, `dD_io[k]` holds the k-th tangent dX.
+```
+
+## Enzyme VJP (reverse)
 
 Take cotangent ``\bar X`` on the solution ``X`` and use the Frobenius
 pairing ``\langle U, V \rangle = \operatorname{tr}(U^\top V)``.
 
-**Step 1: adjoint Sylvester.** Differentiating (KS) and taking
-``\langle \Lambda, \cdot \rangle`` with the linear operator ``\mathcal{L}``
-gives the adjoint equation
+**Step 1: adjoint Sylvester.** Differentiating (KS) and pairing with
+``\Lambda`` against the linear operator ``\mathcal{L}`` gives the
+adjoint equation
 
 ```math
 A^\top\,\Lambda \;+\; B^\top\,\Lambda\,(C^\top \otimes C^\top) \;=\; \bar X.
@@ -141,7 +214,7 @@ from the matrix product rule:
 \;\in\; \mathbb{R}^{m^2 \times m^2}.
 ```
 
-The product rule ``d(C \otimes C) = (dC \otimes C) + (C \otimes dC)``
+The product rule ``\mathrm{d}(C \otimes C) = (\mathrm{d}C \otimes C) + (C \otimes \mathrm{d}C)``
 turns this into a sum of two index contractions. Using the
 column-major Kronecker convention
 ``(C \otimes C)_{(i-1)m+k,\,(j-1)m+l} = C_{i,j}\,C_{k,l}``,
@@ -159,12 +232,22 @@ The implementation accumulates these as ``\bar C_{ij} \mathrel{-}= \ldots``
 (absorbing the minus sign from ``\bar K = -X^\top B^\top \Lambda``
 into the accumulator).
 
-**Step 4: code path.** `ext/enzyme_sylvester_kamenik.jl` implements
-the rule. The augmented primal caches ``X``, ``A``, ``B``, ``C`` on
-the tape (``D`` is not needed in the reverse formulae). The reverse
-pass calls `gsylv_kamenik` once on the transposed inputs to obtain
-``\Lambda``, then accumulates the four pullbacks. Single-cotangent
-only (`EnzymeRules.width(config) == 1`) — explicitly asserted.
+**Step 4: in-place form.** `gsylv_kamenik!` overwrites the input
+buffer `D` with the solution `X`. The Enzyme reverse rule accordingly
+treats the `Duplicated(D, D̄)` slot as carrying the cotangent of the
+post-call value (the solution `X̄`) on entry, and overwrites it with
+``\Lambda`` — the cotangent of the pre-call value (the original RHS).
+The four parameter pullbacks are otherwise identical to the
+allocating form.
+
+### Code path
+
+`ext/enzyme_sylvester_kamenik.jl` implements both rules. The augmented
+primal caches ``X``, ``A``, ``B``, ``C`` on the tape (``D`` is not
+needed in the reverse formulae). The reverse pass calls
+`gsylv_kamenik` once on the transposed inputs to obtain ``\Lambda``,
+then accumulates the four pullbacks. Single-cotangent only
+(`EnzymeRules.width(config) == 1`) — explicitly asserted.
 
 ## Differentiating through `gsylv_kamenik`
 

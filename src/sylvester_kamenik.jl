@@ -11,13 +11,13 @@ for `X`. Only `order = 2` (one Kronecker square `C ⊗ C`) is implemented.
 
 `A`, `B` ∈ ℝⁿˣⁿ; `C` ∈ ℝᵐˣᵐ; `D` ∈ ℝⁿˣᵐ²; the returned `X` has the same
 shape as `D`. Inputs are not modified — the function copies `D` and calls
-the in-place [`gsylv_kamenik!`](@ref). The Enzyme reverse rule attaches to
-this allocating variant.
+the in-place [`gsylv_kamenik!`](@ref). The Enzyme forward and reverse
+rules attach to this allocating variant.
 
 The equation arises in second-order perturbation solutions of nonlinear
-DSGE models around a saddle-path steady state — see the `Compact Order-2
-Kronecker Sylvester (Kamenik)` section of `DERIVATIONS.md` for context,
-the Kamenik (2005) reference, and the AD derivation.
+DSGE models around a saddle-path steady state — see the
+[`docs/src/sylvester_kamenik.md`](@ref) page for the Kamenik (2005)
+reference, the AD derivations, and worked examples.
 
 See also [`gsylv_kamenik!`](@ref).
 """
@@ -88,50 +88,112 @@ Schur-basis change and its inverse apply `(U_C ⊗ U_C)` / `(U_C ⊗ U_C)'`
 to a `n × m²` matrix without materializing the `m² × m²` Kronecker — for
 each of the two tensor axes the operator factors as a single matrix
 multiply against `U_C` (column-major reshape).
+
+Internally a private factor/solve split (`_gsylv_kamenik_factor` /
+`_gsylv_kamenik_solve!`) is used so the Enzyme forward rule can amortise
+one Schur factorisation across the primal solve and all tangent solves.
 """
 function gsylv_kamenik!(
         D::AbstractMatrix{Float64},
         A::AbstractMatrix{Float64},
         B::AbstractMatrix{Float64},
         C::AbstractMatrix{Float64},
+        order::Val = Val(2),
+    )
+    cache = _gsylv_kamenik_factor(A, B, C, order)
+    _gsylv_kamenik_solve!(cache, D)
+    return D
+end
+
+# ─── Private factor/solve API ────────────────────────────────────────────────
+#
+# `_gsylv_kamenik_factor(A, B, C)` produces a cache containing the LU of
+# `A`, the two real Schur factorisations (T, U_B for A⁻¹·B and S, U_C for
+# C), and pre-allocated scratch buffers reused inside the per-slice back
+# substitution. `_gsylv_kamenik_solve!(cache, D)` applies the change of
+# basis, runs the forward iteration, undoes the basis change, and
+# overwrites `D` with the solution `X`. Both `A` / `B` / `C` are not read
+# by the solve step — only the cache is. This split lets the Enzyme
+# forward rule call `factor` once and reuse it across the primal + each
+# tangent RHS.
+
+@concrete struct KamenikCache
+    F                    # lu(A)
+    T                    # real Schur of A⁻¹·B, quasi-upper-triangular
+    UB                   # orthogonal basis of T
+    S                    # real Schur of C, quasi-upper-triangular
+    UC                   # orthogonal basis of S
+    n::Int
+    m::Int
+    # Persistent scratch — sized at factor time so that solve! is
+    # alloc-free apart from the F\D (n × m²) and UB' · (F\D) work GEMMs.
+    T1                   # n × m × m
+    Dt                   # n × m × m
+    Xt                   # n × m × m
+    slice_buf            # n × m
+    TX_buf               # n × m
+    Tscaled              # n × n
+    RHS_buf              # 2n × m  (2×2 Schur block path)
+    Bblk_buf             # 2n × 2n (2×2 Schur block path)
+    I_m                  # m × m identity (gsylv arg)
+    I_2n                 # 2n × 2n identity (gsylv arg)
+end
+
+function _gsylv_kamenik_factor(
+        A::AbstractMatrix{Float64},
+        B::AbstractMatrix{Float64},
+        C::AbstractMatrix{Float64},
         ::Val{order} = Val(2),
     ) where {order}
-    @assert order == 2 "gsylv_kamenik! implements order = 2 only"
+    @assert order == 2 "gsylv_kamenik implements order = 2 only"
     n = size(A, 1)
     m = size(C, 1)
     @assert size(A) == (n, n)
     @assert size(B) == (n, n)
     @assert size(C) == (m, m)
-    @assert size(D) == (n, m^2)
 
     F = lu(A)
     Bp = F \ B
-    Dp = F \ D
 
     SB = schur(Bp); T = SB.T; UB = SB.Z
     SC = schur(C);  S = SC.T;  UC = SC.Z
 
-    # D̃ = UB' · Dp · (UC ⊗ UC), computed as one big GEMM + m small GEMMs
-    # against UC, without forming the m²×m² Kronecker.
-    DpB = UB' * Dp                                              # n × m²
     T1 = Array{Float64}(undef, n, m, m)
-    mul!(reshape(T1, n * m, m), reshape(DpB, n * m, m), UC)     # j-axis
     Dt = Array{Float64}(undef, n, m, m)
+    Xt = Array{Float64}(undef, n, m, m)
+    slice_buf = Matrix{Float64}(undef, n, m)
+    TX_buf = Matrix{Float64}(undef, n, m)
+    Tscaled = Matrix{Float64}(undef, n, n)
+    RHS_buf = Matrix{Float64}(undef, 2n, m)
+    Bblk_buf = Matrix{Float64}(undef, 2n, 2n)
+    I_m = Matrix{Float64}(I, m, m)
+    I_2n = Matrix{Float64}(I, 2n, 2n)
+
+    return KamenikCache(
+        F, T, UB, S, UC, n, m,
+        T1, Dt, Xt, slice_buf, TX_buf, Tscaled,
+        RHS_buf, Bblk_buf, I_m, I_2n,
+    )
+end
+
+function _gsylv_kamenik_solve!(cache::KamenikCache, D::AbstractMatrix{Float64})
+    (;
+        F, T, UB, S, UC, n, m,
+        T1, Dt, Xt, slice_buf, TX_buf, Tscaled,
+        RHS_buf, Bblk_buf, I_m, I_2n,
+    ) = cache
+    @assert size(D) == (n, m^2)
+
+    # D̃ = UB' · (A⁻¹·D) · (UC ⊗ UC), via two-pass GEMM against UC (no
+    # m²×m² Kronecker materialised).
+    Dp = F \ D                                                  # n × m²
+    DpB = UB' * Dp                                              # n × m²
+    mul!(reshape(T1, n * m, m), reshape(DpB, n * m, m), UC)     # j-axis
     for l in 1:m
         @views mul!(Dt[:, :, l], T1[:, :, l], UC)               # i-axis
     end
 
-    Xt = zeros(Float64, n, m, m)
-
-    # Per-iteration scratch, allocated once.
-    slice_buf = Matrix{Float64}(undef, n, m)
-    TX_buf    = Matrix{Float64}(undef, n, m)
-    Tscaled   = Matrix{Float64}(undef, n, n)
-    # 2×2 complex-block scratch — always alloc'd; tiny vs the rest.
-    RHS_buf  = Matrix{Float64}(undef, 2n, m)
-    Bblk_buf = Matrix{Float64}(undef, 2n, 2n)
-    I_m      = Matrix{Float64}(I, m, m)
-    I_2n     = Matrix{Float64}(I, 2n, 2n)
+    fill!(Xt, 0.0)
 
     o = 1
     while o <= m
@@ -161,19 +223,19 @@ function gsylv_kamenik!(
                 end
                 @views RHS_buf[(k * n + 1):((k + 1) * n), :] .= slice_buf
             end
-            @views Bblk_buf[1:n,         1:n]         .= S[o,     o]     .* T
-            @views Bblk_buf[1:n,         (n + 1):(2n)] .= S[o + 1, o]     .* T
-            @views Bblk_buf[(n + 1):(2n), 1:n]         .= S[o,     o + 1] .* T
+            @views Bblk_buf[1:n, 1:n] .= S[o, o] .* T
+            @views Bblk_buf[1:n, (n + 1):(2n)] .= S[o + 1, o] .* T
+            @views Bblk_buf[(n + 1):(2n), 1:n] .= S[o, o + 1] .* T
             @views Bblk_buf[(n + 1):(2n), (n + 1):(2n)] .= S[o + 1, o + 1] .* T
             Y = MatrixEquations.gsylv(I_2n, I_m, Bblk_buf, S, RHS_buf)
-            @views Xt[:, :, o]     .= Y[1:n,         :]
+            @views Xt[:, :, o] .= Y[1:n, :]
             @views Xt[:, :, o + 1] .= Y[(n + 1):(2n), :]
         end
         o += w
     end
 
-    # X = UB · Xt · (UC ⊗ UC)'.  Same two-pass trick with UC'; reuse
-    # T1 / Dt as scratch (no longer needed).
+    # X = UB · Xt · (UC ⊗ UC)'. Same two-pass trick with UC'; reuse T1
+    # / Dt as scratch (no longer needed for the forward iteration).
     mul!(reshape(T1, n * m, m), reshape(Xt, n * m, m), UC')      # j-axis: UC'
     for l in 1:m
         @views mul!(Dt[:, :, l], T1[:, :, l], UC')               # i-axis: UC'
