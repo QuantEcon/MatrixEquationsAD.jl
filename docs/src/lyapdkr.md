@@ -209,7 +209,7 @@ Y\,A\,X^\top \;+\; Y^\top\,A\,X.
 ## Example: RBC stationary distribution
 
 Using the RBC policy values from the
-[Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy),
+[Klein Policy Map quick start](@ref "Quick start: parameters to policy"),
 on the static (``N = 2``, fully heap-free) path:
 
 ```jldoctest lyapdkr_rbc

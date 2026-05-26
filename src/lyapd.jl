@@ -22,11 +22,23 @@ function lyapdfactor(A::StridedMatrix{T}) where {T <: Union{Float32, Float64}}
 end
 
 # Triangular-form Lyapunov solve in the Schur basis, then untransform.
-# Dense-`C` path routes onto `sylvds!`; Symmetric-`C` path onto `lyapds!`.
+# Both `lyapdsolve` and `lyapdadjointsolve` implement docs § Primal:
+#     X = Z · X̃ · Z'    with    T·X̃·T' − X̃ + C̃ = 0,  C̃ = Z'·C·Z
+# under A = Z·T·Z'. The forward solver uses `sylvds!(−T, T, ·; adjB)` /
+# `lyapds!`; the adjoint reuses the same Schur factors but with the
+# kernel's `adjA = true` (`adj = true` for `lyapds!`) flag — this gives
+# X̃ satisfying T'·X̃·T − X̃ + C̃ = 0, i.e. L_A^*[X] = C in docs § Enzyme VJP
+# Step 1.
+#
+# Dense-`C` path routes onto `sylvds!`; Symmetric-`C` path onto `lyapds!`
+# (kernel that enforces symmetry on the output).
 
 function lyapdsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
+    # Forward Schur transform C̃ = Z'·C·Z …
     rhs = cache.Z' * C * cache.Z
+    # … solve T·X̃·T' − X̃ + C̃ = 0 in the Schur basis …
     sylvds!(-cache.T, cache.T, rhs; adjB = true)
+    # … untransform back: X = Z · X̃ · Z'.
     rhs = cache.Z * rhs * cache.Z'
     return rhs
 end
@@ -34,6 +46,7 @@ end
 function lyapdsolve(
         cache::LyapDSchurCache, C::Symmetric{T, <:StridedMatrix{T}},
     ) where {T}
+    # `utqu(C, Z)` = Z'·C·Z and `utqu!(·, Z')` = Z·…·Z', both symmetry-aware.
     rhs = utqu(C, cache.Z)
     lyapds!(cache.T, rhs)
     utqu!(rhs, cache.Z')
@@ -41,6 +54,8 @@ function lyapdsolve(
 end
 
 function lyapdadjointsolve(cache::LyapDSchurCache, C::StridedMatrix{T}) where {T}
+    # Same Schur basis as the forward solve; `adjA = true` switches the
+    # kernel to T'·X̃·T − X̃ + C̃ = 0 (docs § Enzyme VJP Step 1, L_A^*).
     rhs = cache.Z' * C * cache.Z
     sylvds!(-cache.T, cache.T, rhs; adjA = true)
     rhs = cache.Z * rhs * cache.Z'
@@ -51,7 +66,7 @@ function lyapdadjointsolve(
         cache::LyapDSchurCache, C::Symmetric{T, <:StridedMatrix{T}},
     ) where {T}
     rhs = utqu(C, cache.Z)
-    lyapds!(cache.T, rhs; adj = true)
+    lyapds!(cache.T, rhs; adj = true)   # Symmetric kernel, transposed.
     utqu!(rhs, cache.Z')
     return rhs
 end

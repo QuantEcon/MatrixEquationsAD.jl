@@ -34,11 +34,14 @@ adjoint pass never re-Schurs `A`. A cache-taking overload
 
 Implementation pointers:
 
-- `ext/enzyme_lyapunov.jl` — `LyapDSchurCache`, `lyapdfactor`,
-  `lyapdsolve`, `lyapdadjointsolve`, the cache-aware `lyapd(A, C)`
-  shadow, and the Enzyme forward / reverse rules.
-- `ext/forwarddiff_lyapunov.jl` — the ForwardDiff `Dual` dispatch on
-  `lyapd(A, C)`, which uses the same cache primitives.
+- `src/lyapd.jl` — `LyapDSchurCache`, `lyapdfactor`, `lyapdsolve`,
+  `lyapdadjointsolve`, the cache-aware `lyapd(A, C)` shadow, and the
+  in-place `lyapd!` Float methods (the primal kernels both extensions
+  share).
+- `ext/enzyme_lyapunov.jl` — Enzyme forward / reverse rules for `lyapd`
+  and `lyapd!`.
+- `ext/forwarddiff_lyapunov.jl` — ForwardDiff `Dual` dispatches on the
+  same surface, reusing the primal cache primitives.
 - `MatrixEquations.lyapds!` — upstream in-place kernel operating on
   ``A`` in real or complex Schur form (`adj = false / true` for
   transpose variants).
@@ -199,7 +202,7 @@ convention with ``A = h_x``, the stationary covariance ``V`` of
 ``C = Q``.
 
 Using the RBC policy values from the
-[Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy):
+[Klein Policy Map quick start](@ref "Quick start: parameters to policy"):
 
 ```jldoctest lyapd_rbc
 julia> using LinearAlgebra: Symmetric
@@ -290,7 +293,7 @@ function ``\tilde V_{kk}(p)`` returning the stationary variance of
 capital under the linearised RBC model. Every supported AD backend
 differentiates it end-to-end. The function below uses the same
 `rbc_first_order_assembly(p)` as the
-[Klein Policy Map quick start](klein_map.md#quick-start:-parameters-to-policy)
+[Klein Policy Map quick start](@ref "Quick start: parameters to policy")
 (reproduced for self-containment), pipes its output through
 `klein_map`, then solves
 ``V = h_x V h_x^\top + Q`` with

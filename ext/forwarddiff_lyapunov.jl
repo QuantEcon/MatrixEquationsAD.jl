@@ -17,8 +17,15 @@
 
 # OOP `lyapd(::Dual…, ::Dual…)`: one `schur(A_val)`, `N` triangular tangent
 # solves, then package values + partials back into `Dual` outputs.
+#
+# Implements docs § ForwardDiff JVP directly — same JVP equation as the
+# Enzyme forward rule:
+#     L_A[dX] = dC + dA·X·A' + A·X·dA',
+# solved once per partial direction against the cached `schur(A)`.
 
 function _lyapd_forwarddiff(A, C, ::Type{D}) where {T, V, N, D <: Dual{T, V, N}}
+    # Strip Dual wrappers → value layer; build one Schur cache shared
+    # across the primal solve and all N partial-direction solves.
     Aval = _primal_argument(A)
     Cval = _primal_argument(C)
     cache = lyapdfactor(Aval)
@@ -26,14 +33,17 @@ function _lyapd_forwarddiff(A, C, ::Type{D}) where {T, V, N, D <: Dual{T, V, N}}
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta
+        # Per partial i: rhs = dC + dA·X·A' + A·X·dA'.
         dC = _partial_argument(C, i)
         rhs = _dense_copy(dC)
         dA = _partial_argument(A, i)
-        rhs .+= dA * X * Aval'
-        rhs .+= Aval * X * dA'
+        rhs .+= dA * X * Aval'     # dA · X · A'
+        rhs .+= Aval * X * dA'     # A · X · dA'
+        # Triangular Schur-form solve via the cached factor.
         lyapdsolve(cache, _symmetric_like(Cval, rhs))
     end
 
+    # Re-pack X and all partials into Dual outputs.
     return map(CartesianIndices(X)) do idx
         Base.@_inline_meta
         Dual{T}(X[idx], Partials(ntuple(k -> dXs[k][idx], Val(N))))
@@ -57,6 +67,9 @@ end
 # `N` tangent solves and pack `Dual`s back into the caller's `X` buffer.
 
 function _lyapd_inplace_forwarddiff!(X, A, C, ::Type{D}) where {T, V, N, D <: Dual{T, V, N}}
+    # Same docs § ForwardDiff JVP as the OOP overload; only difference is
+    # the primal value gets written into a `Matrix{V}` workspace and the
+    # final Duals are packed into the caller's output buffer `X`.
     Aval = _primal_argument(A)
     Cval = _primal_argument(C)
     cache = lyapdfactor(Aval)
@@ -65,6 +78,7 @@ function _lyapd_inplace_forwarddiff!(X, A, C, ::Type{D}) where {T, V, N, D <: Du
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta
+        # rhs = dC + dA·X·A' + A·X·dA'.
         dC = _partial_argument(C, i)
         rhs = _dense_copy(dC)
         dA = _partial_argument(A, i)
@@ -73,6 +87,7 @@ function _lyapd_inplace_forwarddiff!(X, A, C, ::Type{D}) where {T, V, N, D <: Du
         lyapdsolve(cache, _symmetric_like(Cval, rhs))
     end
 
+    # Pack value + N partials into Duals at each index.
     @inbounds for idx in CartesianIndices(X)
         X[idx] = Dual{T}(X_val[idx], Partials(ntuple(k -> dXs[k][idx], Val(N))))
     end

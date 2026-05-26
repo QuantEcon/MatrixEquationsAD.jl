@@ -6,6 +6,10 @@ function EnzymeRules.forward(
         C::Annotation{<:StridedMatrix{T}};
         M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}, T <: Union{Float32, Float64}}
+    # Docs § ForwardDiff JVP — same JVP equation as the FD path:
+    #   vec(dX_raw) = M⁻¹ · vec(dC + dA·X·A' + A·X·dA'),
+    #   dX = P(dX_raw).
+    # Build M = I − A ⊗ A and its LU once; reuse for primal + all N tangents.
     N = EnzymeRules.width(config)
     n = size(A.val, 1)
     M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
@@ -15,9 +19,10 @@ function EnzymeRules.forward(
     ldiv!(F, vec(X))
     symmetrize!!(X)
 
-    # Pack tangent RHSs into a single n × n × N tensor so we can do one
-    # BLAS-3 multi-RHS solve instead of N per-tangent solves. `XAt` / `AX`
-    # are reused across tangents.
+    # Per-direction RHS construction, packed into one n × n × N tensor for
+    # a single BLAS-3 multi-RHS solve.
+    #   XAt = X · A',  AX = A · X — shared across all tangents (don't
+    #   depend on dA / dC).
     RHS = Array{T, 3}(undef, n, n, N)
     if !(typeof(A) <: Const)
         XAt = X * A.val'
@@ -25,18 +30,23 @@ function EnzymeRules.forward(
     end
     @inbounds for i in 1:N
         dX = view(RHS, :, :, i)
+        # dX ← dC_i (or zero if C is Const).
         if typeof(C) <: Const
             fill!(dX, zero(T))
         else
             dX .= N == 1 ? C.dval : C.dval[i]
         end
         if !(typeof(A) <: Const)
+            # dX += dA · X · A' + A · X · dA'.
             dA = N == 1 ? A.dval : A.dval[i]
             mul!(dX, dA, XAt, one(T), one(T))
             mul!(dX, AX, dA', one(T), one(T))
         end
     end
+    # Single multi-RHS solve over all N stacked tangent directions.
     ldiv!(F, reshape(RHS, n * n, N))
+    # Symmetric projection per direction (docs § Primal: P(·) on the
+    # reshape-as-(n,n) output).
     @inbounds for i in 1:N
         symmetrize!!(view(RHS, :, :, i))
     end
@@ -93,26 +103,37 @@ function EnzymeRules.reverse(
         C::Annotation{<:StridedMatrix{T}};
         M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT, T <: Union{Float32, Float64}}
+    # Docs § Enzyme VJP:
+    #   1. Symmetrise the upstream cotangent: S = P(X̄).
+    #   2. Solve the transposed Kronecker system: vec(Y) = M⁻ᵀ · vec(S).
+    #   3. Parameter cotangents
+    #        C̄ += Y,
+    #        Ā += Y·A·X' + Y'·A·X.
+    # The LU `F` of M is re-used from the tape (built once by
+    # augmented_primal); no re-LU on the reverse pass.
     X, dXs, F, Aval = tape
     N = EnzymeRules.width(config)
     n = size(X, 1)
 
     for i in 1:N
         Xbar = N == 1 ? dXs : dXs[i]
+        # Step 1 + 2: Y = M⁻ᵀ · vec(P(X̄)), in place.
         Y = copy(Xbar)
         symmetrize!!(Y)
         ldiv!(transpose(F), vec(Y))
 
         if !(typeof(C) <: Const)
+            # Step 3: C̄ += Y.
             dC = N == 1 ? C.dval : C.dval[i]
             dC .+= Y
         end
         if !(typeof(A) <: Const)
+            # Step 3: Ā += Y·A·X' + Y'·A·X — two GEMMs into dA.
             dA = N == 1 ? A.dval : A.dval[i]
             tmp = Y * Aval
-            mul!(dA, tmp, X', one(T), one(T))
+            mul!(dA, tmp, X', one(T), one(T))     # Y · A · X'
             tmp = Y' * Aval
-            mul!(dA, tmp, X, one(T), one(T))
+            mul!(dA, tmp, X, one(T), one(T))      # Y' · A · X
         end
 
         fill!(Xbar, zero(T))
@@ -138,6 +159,9 @@ function EnzymeRules.forward(
         C::Annotation{<:StridedMatrix{T}};
         M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT, T <: Union{Float32, Float64}}
+    # Same docs § ForwardDiff JVP as the OOP forward rule. Build M and
+    # its LU once, solve the primal into the caller-supplied X.val, then
+    # solve each tangent into the matching X.dval slot.
     n = size(A.val, 1)
     M = isnothing(M_ws) ? Matrix{T}(undef, n * n, n * n) : M_ws
     build_M!!(M, A.val)
@@ -150,6 +174,8 @@ function EnzymeRules.forward(
 
     N = EnzymeRules.width(config)
     for i in 1:N
+        # Per-direction RHS = dC + dA·X·A' + A·X·dA' assembled in-place
+        # into the caller's shadow buffer, then solved + projected.
         dX = N == 1 ? X.dval : X.dval[i]
         if typeof(C) <: Const
             fill!(dX, zero(T))
@@ -158,11 +184,11 @@ function EnzymeRules.forward(
         end
         if !(typeof(A) <: Const)
             dA = N == 1 ? A.dval : A.dval[i]
-            dX .+= dA * X.val * A.val'
-            dX .+= A.val * X.val * dA'
+            dX .+= dA * X.val * A.val'      # dA · X · A'
+            dX .+= A.val * X.val * dA'      # A · X · dA'
         end
-        ldiv!(F, vec(dX))
-        symmetrize!!(dX)
+        ldiv!(F, vec(dX))                   # vec(dX) ← M⁻¹ · vec(rhs)
+        symmetrize!!(dX)                    # dX ← P(dX)
     end
     return nothing
 end
@@ -197,6 +223,11 @@ function EnzymeRules.reverse(
         C::Annotation{<:StridedMatrix{T}};
         M_ws::Union{Nothing, StridedMatrix{T}} = nothing,
     ) where {RT, T <: Union{Float32, Float64}}
+    # Same docs § Enzyme VJP as the OOP reverse rule:
+    #   1. Y = M⁻ᵀ · vec(P(X̄))    (LU `F` of M reused from the tape).
+    #   2. C̄ += Y,  Ā += Y·A·X' + Y'·A·X.
+    # Primal X read from the tape (`Xval`) rather than X.val because the
+    # in-place call may have been chained.
     Xval, F, Aval = tape
     N = EnzymeRules.width(config)
     n = size(Xval, 1)
@@ -205,20 +236,23 @@ function EnzymeRules.reverse(
 
     for i in 1:N
         Xbar = N == 1 ? X.dval : X.dval[i]
+        # Step 1: Y = M⁻ᵀ · vec(P(X̄)).
         Y = copy(Xbar)
         symmetrize!!(Y)
         ldiv!(transpose(F), vec(Y))
 
         if !(typeof(C) <: Const)
+            # Step 2: C̄ += Y.
             dC = N == 1 ? C.dval : C.dval[i]
             dC .+= Y
         end
         if !(typeof(A) <: Const)
+            # Step 2: Ā += Y·A·X' + Y'·A·X.
             dA = N == 1 ? A.dval : A.dval[i]
             tmp = Y * Aval
-            mul!(dA, tmp, Xval', one(T), one(T))
+            mul!(dA, tmp, Xval', one(T), one(T))   # Y · A · X'
             tmp = Y' * Aval
-            mul!(dA, tmp, Xval, one(T), one(T))
+            mul!(dA, tmp, Xval, one(T), one(T))    # Y' · A · X
         end
 
         fill!(Xbar, zero(T))
