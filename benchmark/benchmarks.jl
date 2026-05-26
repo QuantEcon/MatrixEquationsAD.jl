@@ -12,6 +12,7 @@ const bench_dir = joinpath(pkgdir(MatrixEquationsAD), "benchmark")
 
 SUITE["klein_map"] = include(joinpath(bench_dir, "klein_map.jl"))
 SUITE["gsylv"] = include(joinpath(bench_dir, "gsylv.jl"))
+SUITE["gsylv_kamenik"] = include(joinpath(bench_dir, "sylvester_kamenik.jl"))
 SUITE["lyapd"] = include(joinpath(bench_dir, "lyapd.jl"))
 SUITE["lyapdkr"] = include(joinpath(bench_dir, "lyapdkr.jl"))
 SUITE["ared"] = include(joinpath(bench_dir, "ared.jl"))
