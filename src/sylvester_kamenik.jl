@@ -61,12 +61,11 @@ function gsylv_kamenik!(
     return D
 end
 
-# ─── Private factor/solve API ────────────────────────────────────────────────
-#
-# Split for the Enzyme forward rule: `_gsylv_kamenik_factor` caches the
-# LU of A, the two real Schur factors (T, U_B for A⁻¹·B and S, U_C for C),
-# and persistent scratch; `_gsylv_kamenik_solve!(cache, D)` reads only
-# the cache + per-call RHS and overwrites D in place with X.
+# Private factor/solve API. The split exists so the Enzyme forward rule
+# can amortise one Schur factorisation across the primal + every tangent
+# RHS: `_gsylv_kamenik_factor` caches lu(A), the two Schur factors, and
+# persistent scratch; `_gsylv_kamenik_solve!(cache, D)` reads only the
+# cache + per-call RHS and overwrites D in place with X.
 
 @concrete struct KamenikCache
     F                    # lu(A)
@@ -139,37 +138,30 @@ function _gsylv_kamenik_solve!(cache::KamenikCache, D::AbstractMatrix{Float64})
     ) = cache
     @assert size(D) == (n, m^2)
 
-    # Change of basis into the Schur frame — docs § Primal algorithm,
-    # stage 2 closing identity:
-    #   D̃ = U_B' · (A⁻¹·D) · (U_C ⊗ U_C).
-    # The (U_C ⊗ U_C) leg is applied via the two-pass GEMM trick
-    # described at the end of stage 2: reshape `n × m²` as `(n, m, m)`,
-    # contract along the trailing `j`-axis, then per `l`-slice along the
-    # `i`-axis. Avoids materialising the `m² × m²` Kronecker.
-    Dp = F \ D                                                  # n × m²
-    DpB = UB' * Dp                                              # n × m²
-    mul!(reshape(T1, n * m, m), reshape(DpB, n * m, m), UC)     # j-axis pass
+    # Docs § Primal algorithm, stage 2: D̃ = U_B' · (A⁻¹·D) · (U_C ⊗ U_C).
+    # The (U_C ⊗ U_C) leg is two GEMMs against U_C (no m²×m² Kron):
+    # reshape (n, m²) → (n, m, m), contract along the j-axis, then per
+    # l-slice along the i-axis.
+    Dp = F \ D
+    DpB = UB' * Dp
+    mul!(reshape(T1, n * m, m), reshape(DpB, n * m, m), UC)     # j-axis
     for l in 1:m
-        @views mul!(Dt[:, :, l], T1[:, :, l], UC)               # i-axis pass
+        @views mul!(Dt[:, :, l], T1[:, :, l], UC)               # i-axis
     end
 
-    # Stage 3 — column-by-column back-substitution.  In Schur coords
-    # the system is `X̃ + T · X̃ · (S ⊗ S) = D̃`; viewed as
-    # `X̃[:, p, o]` (column-major Kron), each `o`-slice depends only on
-    # earlier `o' < o` slices because S is quasi-upper-triangular.
+    # Docs § stage 3: in Schur coords X̃ + T·X̃·(S ⊗ S) = D̃; column-major
+    # Kron view X̃[:, p, o] depends only on o' < o (S quasi-upper-tri).
     fill!(Xt, 0.0)
 
     o = 1
     while o <= m
-        # `w = 2` whenever a 2×2 complex Schur block straddles
-        # `(o, o+1)`; otherwise `w = 1` (1×1 real block).
+        # w = 2 on a 2×2 complex Schur block straddling (o, o+1).
         w = (o < m && S[o + 1, o] != 0.0) ? 2 : 1
 
         if w == 1
-            # Docs § stage 3 (1×1 real block):
-            #   X̃[:, :, o] + (S[o,o]·T) · X̃[:, :, o] · S = RHS_o,
-            #   RHS_o = D̃[:, :, o] − Σ_{o' < o} S[o', o] · T · X̃[:, :, o'] · S.
-            # Build RHS_o into `slice_buf` …
+            # 1×1 block:
+            #   X̃[:, :, o] + (S[o,o]·T)·X̃[:, :, o]·S = RHS_o,
+            #   RHS_o = D̃[:, :, o] − Σ_{o' < o} S[o',o]·T·X̃[:, :, o']·S.
             copyto!(slice_buf, view(Dt, :, :, o))
             for op in 1:(o - 1)
                 s_op = S[op, o]
@@ -178,18 +170,15 @@ function _gsylv_kamenik_solve!(cache::KamenikCache, D::AbstractMatrix{Float64})
                     mul!(slice_buf, TX_buf, S, -s_op, 1.0)
                 end
             end
-            # … then solve the triangular Sylvester sub-problem on the
-            # Schur factors `(S[o,o]·T, S)` directly via `sylvds!` — no
-            # re-Schur, because both factors are already quasi-upper-triangular.
+            # Both factors already quasi-upper-triangular → no re-Schur.
             Tscaled .= S[o, o] .* T
             MatrixEquations.sylvds!(Tscaled, S, slice_buf)
             @views Xt[:, :, o] .= slice_buf
         else
-            # Docs § stage 3 (2×2 complex block at (o, o+1)):
-            #   stack Y = [X̃[:, :, o]; X̃[:, :, o+1]] ∈ ℝ^{2n × m},
-            #   solve Y + B_block · Y · S = RHS_stack,
-            #   B_block = [S[o,o]·T  S[o+1,o]·T; S[o,o+1]·T  S[o+1,o+1]·T].
-            # Build the two stacked RHS rows …
+            # 2×2 block at (o, o+1):
+            #   Y = [X̃[:, :, o]; X̃[:, :, o+1]] (2n × m),
+            #   Y + B_block · Y · S = RHS_stack,
+            #   B_block = [S[o,o]·T S[o+1,o]·T; S[o,o+1]·T S[o+1,o+1]·T].
             for k in 0:1
                 copyto!(slice_buf, view(Dt, :, :, o + k))
                 for op in 1:(o - 1)
@@ -201,13 +190,11 @@ function _gsylv_kamenik_solve!(cache::KamenikCache, D::AbstractMatrix{Float64})
                 end
                 @views RHS_buf[(k * n + 1):((k + 1) * n), :] .= slice_buf
             end
-            # … assemble B_block …
             @views Bblk_buf[1:n, 1:n] .= S[o, o] .* T
             @views Bblk_buf[1:n, (n + 1):(2n)] .= S[o + 1, o] .* T
             @views Bblk_buf[(n + 1):(2n), 1:n] .= S[o, o + 1] .* T
             @views Bblk_buf[(n + 1):(2n), (n + 1):(2n)] .= S[o + 1, o + 1] .* T
-            # … and solve via `gsylv` (not `sylvds!`: B_block is not
-            # quasi-upper-triangular, so the generic solver re-Schurs).
+            # B_block is not quasi-upper-triangular → use generic gsylv.
             Y = MatrixEquations.gsylv(I_2n, I_m, Bblk_buf, S, RHS_buf)
             @views Xt[:, :, o] .= Y[1:n, :]
             @views Xt[:, :, o + 1] .= Y[(n + 1):(2n), :]
@@ -215,14 +202,12 @@ function _gsylv_kamenik_solve!(cache::KamenikCache, D::AbstractMatrix{Float64})
         o += w
     end
 
-    # Inverse change of basis — docs § stage 3 closing line
-    #   X = U_B · X̃ · (U_C ⊗ U_C)'.
-    # Mirror the two-pass GEMM with UC' instead of UC; reuse T1/Dt as
-    # scratch (no longer needed for the forward iteration).
-    mul!(reshape(T1, n * m, m), reshape(Xt, n * m, m), UC')      # j-axis: UC'
+    # Inverse basis change X = U_B · X̃ · (U_C ⊗ U_C)' — same two-pass
+    # trick with UC'; T1 / Dt reused as scratch.
+    mul!(reshape(T1, n * m, m), reshape(Xt, n * m, m), UC')
     for l in 1:m
-        @views mul!(Dt[:, :, l], T1[:, :, l], UC')               # i-axis: UC'
+        @views mul!(Dt[:, :, l], T1[:, :, l], UC')
     end
-    mul!(D, UB, reshape(Dt, n, m^2))                             # left-mult by U_B
+    mul!(D, UB, reshape(Dt, n, m^2))
     return D
 end

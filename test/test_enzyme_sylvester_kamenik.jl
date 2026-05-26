@@ -208,8 +208,7 @@ end
 end
 
 if _RUN_SLOW_TESTS
-    # SGU + FVGQ scalability smoke under the slow tier. Each call is fast
-    # but the Enzyme compilation costs ~5s per fixture.
+    # SGU + FVGQ scalability smoke under the slow tier.
     smoke_fixtures = (
         ("sgu", sgu_second_order_sylvester_inputs),
         ("fvgq", fvgq_second_order_sylvester_inputs),

@@ -8,7 +8,7 @@
 # but big enough to exercise the multi-RHS Schur reuse path.
 #
 # Single-`A` AD coverage at `n = 2` (random, non-fixture) lives in
-# `test_forwarddiff_dlyap.jl` and `test_enzyme_dlyap.jl`; this file
+# `test_forwarddiff_lyapd_small.jl` and `test_enzyme_lyapd_small.jl`; this file
 # focuses on the fixture-driven medium-size pencils.
 
 using Enzyme:
@@ -105,8 +105,8 @@ end
 # Random-matrix Enzyme-rule sanity at n = 3 (the multi-pencil AD lanes
 # below are the more thorough coverage gate; this one keeps the small
 # test_forward / test_reverse signal in case fixture sizes change).
-# ~1m30s of Enzyme compilation — gated to the slow tier; the default-tier
-# anchor for `lyapd!` reverse lives in test_enzyme_dlyap.jl.
+# Gated to the slow tier; the default-tier anchor for `lyapd!` reverse
+# lives in test_enzyme_lyapd_small.jl.
 if _RUN_SLOW_TESTS
 @testset "lyapd! Enzyme rules (random n=3)" begin
     rng = MersenneTwister(13)

@@ -142,7 +142,7 @@ function EnzymeRules.reverse(
     return (nothing, nothing)
 end
 
-# ─── Enzyme rules for lyapdkr! ──────────────────────────────────────────────
+# Enzyme rules for lyapdkr! (in-place).
 #
 # `lyapdkr!` writes the solution into the caller-supplied `X`. The rule
 # overwrites `X.val` with the primal and (in forward mode) `X.dval[i]` with

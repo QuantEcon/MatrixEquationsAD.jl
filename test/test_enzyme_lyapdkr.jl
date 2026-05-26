@@ -25,8 +25,8 @@ function lyapdkr_weighted_sum_ws(A, C, W, M_ws)::Float64
     return dot(W, X)
 end
 
-# Manual Enzyme reverse vs FD anchor — fast (~4s). The full EnzymeTestUtils
-# sweep (17s+) is gated under `RUN_SLOW_TESTS` below.
+# Manual Enzyme reverse vs FD anchor. The full EnzymeTestUtils sweep
+# is gated under `RUN_SLOW_TESTS` below.
 @testset "lyapdkr Enzyme reverse vs FD — n=2 anchor" begin
     A = [0.55 0.08; -0.04 0.42]
     C = [1.0 0.2; 0.2 0.7]
@@ -148,9 +148,8 @@ function lyapdkr_inplace_weighted_sum(X, A, C, W)::Float64
 end
 
 if _RUN_SLOW_TESTS
-    # ~6s EnzymeTestUtils sweep on `lyapdkr!`. The n=2 reverse anchor at
-    # the top of this file already covers the OOP form; this gates the
-    # in-place Enzyme rule check.
+    # EnzymeTestUtils sweep on `lyapdkr!`. The n=2 reverse anchor at the
+    # top of this file already covers the OOP form.
     @testset "lyapdkr! Enzyme rules" begin
         A = [0.55 0.08; -0.04 0.42]
         C = [1.0 0.2; 0.2 0.7]

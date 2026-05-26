@@ -31,8 +31,8 @@ end
     end
 
     if _RUN_SLOW_TESTS
-        # Enzyme rule for `gsylv` is a non-production wrapper (not exported);
-        # compilation costs ~55s. Gated to the slow tier.
+        # Enzyme rule for `gsylv` is a non-production wrapper (not
+        # exported); gated to the slow tier.
         @testset "Enzyme reverse gsylv" begin
             A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
             B = [3.0 0.2; -0.1 2.7]

@@ -7,7 +7,7 @@
 #
 # Derivations and pullback formulas: `docs/src/sylvester_kamenik.md`.
 
-# ─── Allocating form: gsylv_kamenik(A, B, C, D) ──────────────────────────────
+# Allocating form: gsylv_kamenik(A, B, C, D).
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
@@ -219,18 +219,12 @@ function EnzymeRules.reverse(
     return (nothing, nothing, nothing, nothing)
 end
 
-# ─── In-place form: gsylv_kamenik!(D, A, B, C) ───────────────────────────────
+# In-place form: gsylv_kamenik!(D, A, B, C).
 #
-# `gsylv_kamenik!(D, A, B, C)` overwrites `D` with the solution `X`. Enzyme
-# sees `D` as a single Annotation that's both RHS-in and solution-out. The
-# `Duplicated(D, D̄)` slot accordingly carries `X̄` on entry to the reverse
-# pass (cotangent of the post-call value, i.e. the solution); the rule
-# writes `Λ` back into the same slot (cotangent of the pre-call value, i.e.
-# the original RHS — `D̄ = Λ`).
-#
-# Forward mode: the `dval` slot starts holding the tangent of the input
-# buffer (dD) and the rule overwrites it with the tangent of the output
-# (dX), matching how Enzyme treats other mutating writes.
+# The `Duplicated(D, D̄)` slot is both RHS-in / solution-out for the
+# primal. Reverse: `D̄` enters as X̄ (cotangent of the post-call value)
+# and the rule overwrites it with Λ (cotangent of the pre-call value).
+# Forward: `D.dval` enters as dD and is overwritten with dX.
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
@@ -280,11 +274,9 @@ function EnzymeRules.forward(
     s2 = !is_C_const ? Array{T}(undef, n, m, m) : nothing
 
     for i in 1:N
-        # In the in-place form, D.dval[i] holds the upstream tangent of
-        # the input buffer (= dD). Build the JVP RHS in place, then
-        # overwrite with the tangent of the output (= dX) via solve!.
-        # All reads (dD) happen before all writes (the −dA·X etc.
-        # subtractions and the final solve!).
+        # Build the JVP RHS in place on D.dval (entering as dD), then
+        # solve! overwrites with dX. Reads happen before writes so the
+        # rhs / output aliasing is safe.
         dX = N == 1 ? D.dval : D.dval[i]
         if !is_A_const
             # − dA · X

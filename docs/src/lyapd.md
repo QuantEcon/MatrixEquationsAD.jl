@@ -116,6 +116,31 @@ julia> Xip == X
 true
 ```
 
+### Hot-loop pattern: share one `schur(A)` across calls
+
+For estimation / optimisation loops that solve the same equation
+against varying right-hand sides, the cache-taking overload
+`lyapd!(X, cache::LyapDSchurCache, C)` lets the caller build the
+Schur factorisation once and reuse it:
+
+```jldoctest lyapd_small
+julia> using MatrixEquationsAD: lyapdfactor
+
+julia> cache = lyapdfactor(A);
+
+julia> X1 = similar(A);  lyapd!(X1, cache, C);
+
+julia> C2 = [1.5 0.1; 0.1 0.9];
+
+julia> X2 = similar(A);  lyapd!(X2, cache, C2);    # no second schur(A)
+
+julia> X1 ≈ lyapd(A, C) && X2 ≈ lyapd(A, C2)
+true
+```
+
+The AD rules use this same plumbing under the hood — one `schur(A)`
+serves the primal and every tangent / cotangent direction.
+
 ## ForwardDiff JVP
 
 **Step 1: differentiate the implicit equation.** For one tangent

@@ -229,7 +229,7 @@ function EnzymeRules.reverse(
     ) where {RT, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_reverse(config, RT, tape, A, C)
 end
-# ─── Enzyme rules for lyapd! ─────────────────────────────────────────────────
+# Enzyme rules for lyapd! (in-place).
 #
 # `lyapd!` returns `nothing` and mutates `X`, so the function-value annotation
 # is always `Const`; tangents/cotangents on the output flow through

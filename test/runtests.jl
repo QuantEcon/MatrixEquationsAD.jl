@@ -2,7 +2,7 @@ using MatrixEquations
 using MatrixEquationsAD
 using Test
 
-# ─── Test tiers ──────────────────────────────────────────────────────────────
+# Test tiers.
 # Two tiers controlled by a single environment variable:
 #
 #   default (CI)           — primal correctness on all fixtures + one
@@ -24,7 +24,7 @@ include("symmetric_matrix_utils.jl")
 include("readme_examples.jl")
 include("test_lyapd.jl")
 include("test_lyapdkr.jl")
-include("test_enzyme_dlyap.jl")
+include("test_enzyme_lyapd_small.jl")
 include("test_enzyme_lyapdkr.jl")
 include("test_enzyme_riccati.jl")
 if RUN_SLOW_TESTS
@@ -34,7 +34,7 @@ include("test_enzyme_sylvester_kamenik.jl")
 if RUN_SLOW_TESTS
     include("test_enzyme_sylvkr.jl")        # gsylvkr — not exported.
 end
-include("test_forwarddiff_dlyap.jl")
+include("test_forwarddiff_lyapd_small.jl")
 include("test_forwarddiff_lyapdkr.jl")
 include("test_forwarddiff_riccati.jl")
 if RUN_SLOW_TESTS

@@ -238,11 +238,11 @@ end
     end
 end
 
-# Manual Enzyme reverse vs FiniteDifferences anchor — fast (~5s) and the
-# only Enzyme rule sanity test that runs on default CI. Uses FD rather
-# than ForwardDiff because klein_map's Dual dispatch requires BOTH A and
-# B to be Duals (paired tag); single-side gradient probes don't trigger
-# it. The full EnzymeTestUtils sweep is gated under `RUN_SLOW_TESTS`.
+# Manual Enzyme reverse vs FiniteDifferences anchor — the only Enzyme
+# rule sanity test on default CI. Uses FD rather than ForwardDiff
+# because klein_map's Dual dispatch requires BOTH A and B to be Duals
+# (paired tag); single-side gradient probes don't trigger it. The full
+# EnzymeTestUtils sweep is gated under `RUN_SLOW_TESTS`.
 @testset "klein_map Enzyme reverse vs FD — RBC anchor" begin
     (; A_schur, B_schur, n_x) = RBCExampleMatrices.rbc_first_order_inputs()
     A = A_schur
