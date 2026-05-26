@@ -10,3 +10,8 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 Documenter = "1"
+Enzyme = "0.13.149"
+ForwardDiff = "1.3.3"
+MatrixEquations = "2.5.8"
+Plots = "1.41.6"
+StaticArrays = "1.9.18"

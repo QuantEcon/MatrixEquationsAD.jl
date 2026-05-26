@@ -24,13 +24,13 @@ MatrixEquationsADForwardDiffStaticArraysExt = ["ForwardDiff", "StaticArrays"]
 MatrixEquationsADStaticArraysExt = ["StaticArrays"]
 
 [compat]
-ConcreteStructs = "0.2.4"
+ConcreteStructs = "0.2"
 Enzyme = "0.13"
 EnzymeTestUtils = "0.2"
 FiniteDifferences = "0.12"
 ForwardDiff = "1"
 LinearAlgebra = "1"
-MatrixEquations = "2.5.8"
+MatrixEquations = "2.5"
 Random = "1"
 StaticArrays = "1"
 Test = "1"
