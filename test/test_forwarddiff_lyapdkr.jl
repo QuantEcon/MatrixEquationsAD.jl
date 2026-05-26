@@ -91,33 +91,37 @@ end
     @test X_dual isa SMatrix{3, 3, <:Dual}
 end
 
-@testset "lyapdkr ForwardDiff rules — M_ws workspace (FVGQ large)" begin
-    fo = FVGQExampleMatrices.fvgq_first_order_inputs()
-    A = fo.h_x
-    B = fo.B_shock
-    n = size(A, 1)
-    C = B * B' + 1.0e-6 * I(n)
-    M_ws = Matrix{Float64}(undef, n * n, n * n)
+if get(ENV, "RUN_SLOW_TESTS", "false") == "true"
+    # FVGQ-scale ForwardDiff Jacobian on `lyapdkr` — n=38, so the LU of
+    # M is O(n⁶). Gated to the slow tier.
+    @testset "lyapdkr ForwardDiff rules — M_ws workspace (FVGQ large)" begin
+        fo = FVGQExampleMatrices.fvgq_first_order_inputs()
+        A = fo.h_x
+        B = fo.B_shock
+        n = size(A, 1)
+        C = B * B' + 1.0e-6 * I(n)
+        M_ws = Matrix{Float64}(undef, n * n, n * n)
 
-    # Probe vector covering both A and C entries
-    x = [vec(A); vec(C)]
-    lyapdkr_vec(x) = vec(lyapdkr(reshape(x[1:(n * n)], n, n),
-                                 reshape(x[(n * n + 1):end], n, n)))
-    function lyapdkr_vec_ws(x)
-        return vec(
-            lyapdkr(
-                reshape(x[1:(n * n)], n, n),
-                reshape(x[(n * n + 1):end], n, n);
-                M_ws,
-            ),
-        )
+        # Probe vector covering both A and C entries
+        x = [vec(A); vec(C)]
+        lyapdkr_vec(x) = vec(lyapdkr(reshape(x[1:(n * n)], n, n),
+                                     reshape(x[(n * n + 1):end], n, n)))
+        function lyapdkr_vec_ws(x)
+            return vec(
+                lyapdkr(
+                    reshape(x[1:(n * n)], n, n),
+                    reshape(x[(n * n + 1):end], n, n);
+                    M_ws,
+                ),
+            )
+        end
+
+        @test lyapdkr_vec_ws(x) ≈ lyapdkr_vec(x)
+
+        J = ForwardDiff.jacobian(lyapdkr_vec, x)
+        J_ws = ForwardDiff.jacobian(lyapdkr_vec_ws, x)
+        @test J ≈ J_ws
     end
-
-    @test lyapdkr_vec_ws(x) ≈ lyapdkr_vec(x)
-
-    J = ForwardDiff.jacobian(lyapdkr_vec, x)
-    J_ws = ForwardDiff.jacobian(lyapdkr_vec_ws, x)
-    @test J ≈ J_ws
 end
 
 @testset "lyapdkr! ForwardDiff rules" begin

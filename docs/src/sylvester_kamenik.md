@@ -141,7 +141,7 @@ formed. Pre-computed ``B\,X`` and ``X\,K`` are reused across tangents.
 directions in one Enzyme call, amortising the factorisation:
 
 ```julia
-using Enzyme: BatchDuplicated, Forward, autodiff
+using Enzyme: BatchDuplicated, Const, Forward, autodiff
 using MatrixEquationsAD: gsylv_kamenik
 
 # (A, B, C, D) from the example above.
@@ -172,7 +172,7 @@ solution:
 Dwork = copy(D)
 dD_io = map(copy, dDs)
 autodiff(
-    Forward, gsylv_kamenik!, Enzyme.Const,
+    Forward, gsylv_kamenik!, Const,
     BatchDuplicated(Dwork, dD_io),
     BatchDuplicated(A, dAs), BatchDuplicated(B, dBs),
     BatchDuplicated(C, dCs),

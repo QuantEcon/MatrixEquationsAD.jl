@@ -72,18 +72,28 @@ end
 function _lyapd_enzyme_forward(
         config::EnzymeRules.FwdConfig, ::Type{RT}, A, C
     ) where {RT <: Union{Const, Duplicated, DuplicatedNoNeed, BatchDuplicated, BatchDuplicatedNoNeed}}
+    # Docs § ForwardDiff JVP / Enzyme forward: differentiating the
+    # implicit equation L_A[X] = C gives another discrete Lyapunov
+    # equation against the SAME A:
+    #     L_A[dX] = dC + dA·X·A' + A·X·dA'.
+    # One `schur(A)` (`lyapdfactor`) is shared across the primal and
+    # every tangent direction.
     N = EnzymeRules.width(config)
     cache = lyapdfactor(A.val)
     retval = lyapdsolve(cache, C.val)
 
     dretvals = ntuple(Val(N)) do i
         Base.@_inline_meta
+        # Build the JVP RHS in lane `i`: start from dC, then add the two
+        # outer-product corrections dA·X·A' and A·X·dA' (only when A is
+        # not Const).
         rhs = _shadow_dense(C, i, N)
         if !(typeof(A) <: Const)
             dA = _shadow_ref(A, i, N)
-            rhs .+= dA * retval * A.val'
-            rhs .+= A.val * retval * dA'
+            rhs .+= dA * retval * A.val'   # dA · X · A'
+            rhs .+= A.val * retval * dA'   # A · X · dA'
         end
+        # Solve L_A[dX] = rhs via the cached Schur factor.
         lyapdsolve(cache, _symmetric_like(C.val, rhs))
     end
 
@@ -159,22 +169,36 @@ function _lyapd_enzyme_reverse(
         config::EnzymeRules.RevConfig,
         ::Type{RT}, tape, A, C
     ) where {RT}
+    # Docs § Enzyme VJP:
+    #   Step 1: solve the adjoint Lyapunov equation Y − A'·Y·A = X̄
+    #           via `lyapdadjointsolve`, reusing the cached `schur(A)`
+    #           stashed on Enzyme's tape by augmented_primal.
+    #   Step 2: parameter cotangents
+    #             C̄ += Y,
+    #             Ā += Y·A·X' + Y'·A·X.
+    # The `_symmetric_part_like` projection upstream of the solve handles
+    # the case where the primal C was `Symmetric` — see docs § Enzyme VJP
+    # opening paragraph about projection onto the symmetric manifold.
     X, dXs, cache, Aval, Aprimal, Cprimal = tape
     N = EnzymeRules.width(config)
     for i in 1:N
         Xbar = N == 1 ? dXs : dXs[i]
+        # Step 1: Y solves L_A^*[Y] = X̄.
         Y = lyapdadjointsolve(cache, _symmetric_part_like(Cprimal, Xbar))
 
         if !(typeof(C) <: Const)
+            # Step 2: C̄ += Y (`_add_parameter_shadow!` projects onto the
+            # symmetric manifold when the primal C was `Symmetric`).
             dC = _shadow_ref(C, i, N)
             _add_parameter_shadow!(Cprimal, dC, Y)
         end
         if !(typeof(A) <: Const)
+            # Step 2: Ā += Y·A·X' + Y'·A·X.
             dA = _shadow_ref(A, i, N)
             tmp = Y * Aval
-            Abar = tmp * X'
+            Abar = tmp * X'                # Y · A · X'
             tmp = Y' * Aval
-            Abar .+= tmp * X
+            Abar .+= tmp * X               # Y' · A · X
             _add_parameter_shadow!(Aprimal, dA, Abar)
         end
 
@@ -205,7 +229,7 @@ function EnzymeRules.reverse(
     ) where {RT, T <: Union{Float32, Float64}}
     return _lyapd_enzyme_reverse(config, RT, tape, A, C)
 end
-# ─── Enzyme rules for lyapd! ─────────────────────────────────────────────────
+# Enzyme rules for lyapd! (in-place).
 #
 # `lyapd!` returns `nothing` and mutates `X`, so the function-value annotation
 # is always `Const`; tangents/cotangents on the output flow through
@@ -215,6 +239,10 @@ end
 function _lyapd_inplace_enzyme_forward(
         config::EnzymeRules.FwdConfig, ::Type{RT}, X, A, C,
     ) where {RT}
+    # Same JVP equation as the out-of-place forward rule (docs §
+    # ForwardDiff JVP). The only difference: the primal solution is
+    # written into `X.val` and each tangent dX is written into the
+    # matching `X.dval` shadow.
     cache = lyapdfactor(A.val)
     lyapd!(X.val, cache, C.val)
 
@@ -224,18 +252,19 @@ function _lyapd_inplace_enzyme_forward(
 
     N = EnzymeRules.width(config)
     for i in 1:N
+        # Build the JVP RHS dC + dA·X·A' + A·X·dA' lane-by-lane.
         # `_shadow_dense(C, …)` already gives a fresh copy of `C.dval[i]`
-        # (or zeros for `Const`); mutate it in place to build the tangent
-        # RHS. `dA` is only read, so `_shadow_ref` is enough — copying it
-        # would be a wasted full-matrix alloc per lane.
+        # (or zeros for `Const`); mutate it in place. `dA` is only read,
+        # so `_shadow_ref` is enough — copying it would be a wasted
+        # full-matrix alloc per lane.
         rhs = _shadow_dense(C, i, N)
         if !(typeof(A) <: Const)
             dA = _shadow_ref(A, i, N)
-            rhs .+= dA * X.val * A.val'
-            rhs .+= A.val * X.val * dA'
+            rhs .+= dA * X.val * A.val'   # dA · X · A'
+            rhs .+= A.val * X.val * dA'   # A · X · dA'
         end
-        # Solve into the caller-supplied shadow buffer directly — saves
-        # the intermediate `dX = lyapdsolve(…); copyto!(…)` alloc.
+        # Solve L_A[dX] = rhs into the caller-supplied shadow buffer —
+        # saves the intermediate `dX = lyapdsolve(…); copyto!(…)` alloc.
         dX_target = N == 1 ? X.dval : X.dval[i]
         lyapd!(dX_target, cache, _symmetric_like(C.val, rhs))
     end
@@ -298,17 +327,27 @@ end
 function _lyapd_inplace_enzyme_reverse(
         config::EnzymeRules.RevConfig, ::Type{RT}, tape, X, A, C,
     ) where {RT}
+    # Same VJP as the out-of-place reverse rule (docs § Enzyme VJP
+    # Steps 1–2):
+    #   Y = L_A^*[X̄] = (I − A'·Y·A)⁻¹ X̄  (in-place via cached schur(A))
+    #   C̄ += Y;   Ā += Y·A·X' + Y'·A·X.
+    # The primal X is read from the tape (`X_primal`), not from `X.val`,
+    # because the in-place rule has already overwritten the caller's
+    # buffer with subsequent calls in the program.
     X_primal, cache, Aval, Aprimal, Cprimal = tape
     N = EnzymeRules.width(config)
     for i in 1:N
         Xbar = N == 1 ? X.dval : X.dval[i]
+        # Step 1: adjoint Lyapunov solve.
         Y = lyapdadjointsolve(cache, _symmetric_part_like(Cprimal, Xbar))
 
         if !(typeof(C) <: Const)
+            # Step 2: C̄ += Y.
             dC = _shadow_ref(C, i, N)
             _add_parameter_shadow!(Cprimal, dC, Y)
         end
         if !(typeof(A) <: Const)
+            # Step 2: Ā += Y·A·X' + Y'·A·X.
             dA = _shadow_ref(A, i, N)
             tmp = Y * Aval
             Abar = tmp * X_primal'

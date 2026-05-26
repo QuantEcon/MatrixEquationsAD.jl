@@ -1,5 +1,10 @@
 const _KLEIN_AD_FLOAT = Union{Float32, Float64}
 
+# Enzyme forward rule for the OOP `klein_map` — routes through the
+# big-K factorisation (docs § Big-K JVP). Build the plan once (which
+# LU-factorises the dense (n n_x) × (n n_x) K), then issue one
+# back-substitution per tangent direction.
+
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
         func::Const{typeof(klein_map)},
@@ -8,15 +13,20 @@ function EnzymeRules.forward(
         B::Annotation{<:StridedMatrix{T}};
         threshold = 1.0e-6,
     ) where {T <: _KLEIN_AD_FLOAT}
+    # Primal first — produces (g_x, h_x) needed to build the plan.
     primal = MatrixEquationsAD.klein_map(A.val, B.val; threshold)
     if RT <: Const || !EnzymeRules.needs_shadow(config)
         return EnzymeRules.needs_primal(config) ? primal : nothing
     end
 
+    # Cache LU of K (docs § Big-K JVP Step 2) — reused across all
+    # tangent directions.
     N = EnzymeRules.width(config)
     plan = _klein_bigk_plan(A.val, B.val, primal.g_x, primal.h_x)
     shadows = ntuple(Val(N)) do i
         Base.@_inline_meta
+        # Const-annotation handling: a Const input contributes a zero
+        # tangent matrix on that side.
         dA = if typeof(A) <: Const
             zeros(T, size(A.val))
         else
@@ -27,6 +37,8 @@ function EnzymeRules.forward(
         else
             N == 1 ? B.dval : B.dval[i]
         end
+        # One JVP solve per direction (Step 3): K⁻¹ · rhs, split into
+        # (d g_x, d h_x).
         _klein_bigk_jvp(
             plan,
             dA,
@@ -81,6 +93,9 @@ function EnzymeRules.reverse(
         B::Annotation{<:StridedMatrix{T}};
         threshold = 1.0e-6,
     ) where {T <: _KLEIN_AD_FLOAT}
+    # Docs § Big-K VJP: Λ = K⁻ᵀ · u, then Ā += −Λ · h_x' · Ψ', B̄ += −Λ · Ψ'.
+    # The plan (incl. LU of K) is rebuilt from the tape's A, B, g, h
+    # snapshots — same K as the augmented_primal would have produced.
     Aval, Bval, g_val, h_val, shadow = tape
     shadow === nothing && return (nothing, nothing)
 
@@ -88,6 +103,8 @@ function EnzymeRules.reverse(
     plan = _klein_bigk_plan(Aval, Bval, g_val, h_val)
     for i in 1:N
         sh = N == 1 ? shadow : shadow[i]
+        # One VJP solve per cotangent direction: Λ-solve + two outer
+        # products into bars.A / bars.B.
         bars = _klein_bigk_vjp(plan, sh.g_x, sh.h_x)
         if !(typeof(A) <: Const)
             dA = N == 1 ? A.dval : A.dval[i]
@@ -113,6 +130,10 @@ function EnzymeRules.forward(
         B::Annotation{<:StridedMatrix{T}};
         threshold = 1.0e-6,
     ) where {T <: _KLEIN_AD_FLOAT}
+    # Enzyme forward rule for the in-place `klein_map!` — routes through
+    # the reduced-Sylvester factorisation (docs § Reduced-Sylvester JVP).
+    # Build the plan once (one LU of n × n C₀, two Schurs on n_y × n_y and
+    # n_x × n_x), then issue one reduced-Sylvester solve per tangent.
     primal = MatrixEquationsAD.klein_map!(g_x.val, h_x.val, A.val, B.val; threshold)
     N = EnzymeRules.width(config)
     plan = _klein_structured_plan(A.val, B.val, g_x.val, h_x.val)
@@ -233,11 +254,18 @@ function EnzymeRules.reverse(
         B::Annotation{<:StridedMatrix{T}};
         threshold = 1.0e-6,
     ) where {T <: _KLEIN_AD_FLOAT}
+    # Docs § Reduced-Sylvester VJP: adjoint Stein + transposed C₀ solve,
+    # then the same Ā / B̄ outer products as the big-K rule. Plan rebuilt
+    # from the tape's A/B/g/h snapshots — same C₀ and Schurs as
+    # augmented_primal would have produced.
     Aval, Bval, g_val, h_val, return_shadow = tape
     N = EnzymeRules.width(config)
     plan = _klein_structured_plan(Aval, Bval, g_val, h_val)
 
     for i in 1:N
+        # Per-direction cotangent accumulator: sum the shadow buffer
+        # (from `Duplicated(g_x, ·)`) and the augmented-primal return
+        # shadow (from the `_NoNeed` variant of the rule).
         g_bar = zeros(T, size(g_val))
         h_bar = zeros(T, size(h_val))
 
@@ -267,14 +295,15 @@ function EnzymeRules.reverse(
             fill!(sh.h_x, zero(T))
         end
 
+        # Single VJP call: corrected adjoint Stein → C₀⁻ᵀ solve → bars.A, bars.B.
         bars = _klein_structured_vjp(plan, g_bar, h_bar)
         if !(typeof(A) <: Const)
             dA = N == 1 ? A.dval : A.dval[i]
-            dA .+= bars.A
+            dA .+= bars.A          # Ā += −Λ · h_x' · Ψ'
         end
         if !(typeof(B) <: Const)
             dB = N == 1 ? B.dval : B.dval[i]
-            dB .+= bars.B
+            dB .+= bars.B          # B̄ += −Λ · Ψ'
         end
     end
     return (nothing, nothing, nothing, nothing)

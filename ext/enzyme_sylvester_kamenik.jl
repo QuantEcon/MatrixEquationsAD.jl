@@ -1,38 +1,13 @@
-# Enzyme rules for `gsylv_kamenik(A, B, C, D)` and `gsylv_kamenik!(D, A, B, C)`.
+# Enzyme rules for `gsylv_kamenik` (allocating + in-place).
 #
 # Forward (JVP): Width = 1 and `BatchDuplicated` / `BatchDuplicatedNoNeed`
-#   supported for both forms; the same Kamenik factorisation is reused
+#   supported for both forms; the Kamenik factorisation is shared
 #   across the primal and every tangent solve.
 # Reverse (VJP): Width = 1 only for both forms.
 #
-# See `docs/src/sylvester_kamenik.md` for the derivations.
-#
-# Math summary:
-#
-#   Primal:   A·X + B·X·(C ⊗ C) = D,   K := C ⊗ C
-#
-#   JVP (tangent): differentiating the primal gives a Kamenik equation in
-#   `dX` with the SAME coefficient triple (A, B, C):
-#
-#       A·dX + B·dX·K = dD − dA·X − dB·(X·K) − B·X·(dC ⊗ C + C ⊗ dC).
-#
-#   VJP (cotangent): Frobenius-adjoint of L[X] = A·X + B·X·K is
-#   L*[Λ] = A'·Λ + B'·Λ·K' — same equation shape with transposed inputs.
-#   The four parameter pullbacks are
-#
-#       D̄ += Λ        (allocating)   /   D̄ ← Λ   (in-place)
-#       Ā -= Λ · X'
-#       B̄ -= Λ · (X · K)'
-#       K̄  = −X' · B' · Λ      (m² × m²)
-#       C̄[i,j] -= Σ_{k,l} R[(i-1)m+k, (j-1)m+l] · C[k,l]
-#                   + Σ_{k,l} R[(k-1)m+i, (l-1)m+j] · C[k,l]
-#       with R := X' · B' · Λ = −K̄.
-#
-# Apply `M · (C₁ ⊗ C₂)` to an `n × m²` matrix `M` via two passes against
-# `C₁` and `C₂` (never materialising the `m² × m²` Kronecker). Result
-# written into `out` (`n × m²`); two `n × m × m` scratch tensors reused.
+# Derivations and pullback formulas: `docs/src/sylvester_kamenik.md`.
 
-# ─── Allocating form: gsylv_kamenik(A, B, C, D) ──────────────────────────────
+# Allocating form: gsylv_kamenik(A, B, C, D).
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
@@ -53,6 +28,10 @@ function EnzymeRules.forward(
     n = size(A.val, 1)
     m = size(C.val, 1)
 
+    # Docs § Enzyme JVP (forward) — the JVP equation
+    #   A · dX + B · dX · K = dD − dA·X − dB·(X·K) − B·X·(dC ⊗ C + C ⊗ dC)
+    # is itself a Kamenik order-2 system with the SAME triple (A, B, C).
+    # Factor once, reuse for the primal and all N tangent solves.
     cache = MatrixEquationsAD._gsylv_kamenik_factor(A.val, B.val, C.val)
     X = copy(D.val)
     MatrixEquationsAD._gsylv_kamenik_solve!(cache, X)
@@ -62,14 +41,18 @@ function EnzymeRules.forward(
     is_C_const = typeof(C) <: Const
     is_D_const = typeof(D) <: Const
 
-    # BX = B · X, used for any tangent that touches B or C.
+    # Precompute the two RHS factors shared across all tangents.
+    #   BX = B · X        — appears in the dC term.
+    #   XK = X · (C ⊗ C)  — appears in the dB term.
+    # XK is computed via the same two-pass GEMM trick the primal uses for
+    # `D · (U_C ⊗ U_C)` (docs § Primal algorithm, stage 2 closing line):
+    # reshape (n × m²) as (n, m, m); contract first against C on the
+    # `j`-axis, then per `l` against C on the `i`-axis.
     BX = if !is_B_const || !is_C_const
         M = Matrix{T}(undef, n, m * m)
         LinearAlgebra.mul!(M, B.val, X)
         M
     end
-    # XK = X · (C ⊗ C) — only the dB term needs this; computed via two
-    # passes against C (no m²×m² Kronecker).
     XK = if !is_B_const
         out = Matrix{T}(undef, n, m * m)
         s1 = Array{T}(undef, n, m, m)
@@ -82,40 +65,46 @@ function EnzymeRules.forward(
         out
     end
     # Per-tangent scratch for `BX · (dC ⊗ C + C ⊗ dC)`.
-    kron_buf = !is_C_const ? Matrix{T}(undef, n, m * m) : nothing
     s1 = !is_C_const ? Array{T}(undef, n, m, m) : nothing
     s2 = !is_C_const ? Array{T}(undef, n, m, m) : nothing
 
     dXs = ntuple(Val(N)) do i
         Base.@_inline_meta
+        # Assemble the JVP RHS for tangent `i`, term-by-term following the
+        # JVP equation above. Const arguments contribute nothing.
         rhs = is_D_const ?
             zeros(T, n, m * m) :
             copy(N == 1 ? D.dval : D.dval[i])
         if !is_A_const
+            # − dA · X
             dA = N == 1 ? A.dval : A.dval[i]
             LinearAlgebra.mul!(rhs, dA, X, -one(T), one(T))
         end
         if !is_B_const
+            # − dB · (X · K) = − dB · XK
             dB = N == 1 ? B.dval : B.dval[i]
             LinearAlgebra.mul!(rhs, dB, XK, -one(T), one(T))
         end
         if !is_C_const
+            # Two two-pass GEMMs for the Kronecker product rule
+            # d(C ⊗ C) = (dC ⊗ C) + (C ⊗ dC) — same trick as XK above
+            # but with one factor swapped in turn.
             dC = N == 1 ? C.dval : C.dval[i]
-            # BX · (C ⊗ dC):  contract C on outer leg, dC on inner.
+            # BX · (C ⊗ dC):  contract C on outer (j) leg, dC on inner (i).
             LinearAlgebra.mul!(reshape(s1, n * m, m), reshape(BX, n * m, m), C.val)
             for l in 1:m
                 @views LinearAlgebra.mul!(s2[:, :, l], s1[:, :, l], dC)
             end
-            copyto!(kron_buf, reshape(s2, n, m * m))
-            rhs .-= kron_buf
+            rhs .-= reshape(s2, n, m * m)
             # BX · (dC ⊗ C):  contract dC on outer leg, C on inner.
             LinearAlgebra.mul!(reshape(s1, n * m, m), reshape(BX, n * m, m), dC)
             for l in 1:m
                 @views LinearAlgebra.mul!(s2[:, :, l], s1[:, :, l], C.val)
             end
-            copyto!(kron_buf, reshape(s2, n, m * m))
-            rhs .-= kron_buf
+            rhs .-= reshape(s2, n, m * m)
         end
+        # Solve the JVP system. Same factorisation as the primal — only the
+        # RHS changes per tangent.
         MatrixEquationsAD._gsylv_kamenik_solve!(cache, rhs)
         rhs
     end
@@ -163,8 +152,11 @@ function EnzymeRules.reverse(
     n = size(Aval, 1)
     m = size(Cval, 1)
 
-    # Adjoint Sylvester: A'·Λ + B'·Λ·(C' ⊗ C') = X̄. Same shape, transposed
-    # inputs. `lu` / `schur` want plain `Matrix{T}`, not lazy `Transpose`.
+    # Docs § Enzyme VJP, Step 1: adjoint Sylvester
+    #   A'·Λ + B'·Λ·(C' ⊗ C') = X̄.
+    # Same equation shape as the primal with transposed inputs, so a
+    # second `gsylv_kamenik` call on (A', B', C') solves it. `lu` / `schur`
+    # want plain `Matrix{T}`, not lazy `Transpose` wrappers, so materialise.
     Xbar = dX
     Λ = gsylv_kamenik(
         Matrix(transpose(Aval)),
@@ -172,6 +164,9 @@ function EnzymeRules.reverse(
         Matrix(transpose(Cval)),
         Xbar,
     )
+
+    # Docs § Enzyme VJP, Step 2: parameter cotangents
+    #   D̄ += Λ,   Ā -= Λ · X',   B̄ -= Λ · (X · K)'.
 
     # D̄ += Λ
     if !(typeof(D) <: Const)
@@ -183,7 +178,8 @@ function EnzymeRules.reverse(
         LinearAlgebra.mul!(A.dval, Λ, transpose(X), -one(T), one(T))
     end
 
-    # B̄ -= Λ · (X · K)' — compute X·K via two-pass GEMM (no m²×m² Kron).
+    # B̄ -= Λ · (X · K)'. Compute X·K via the same two-pass GEMM trick the
+    # primal and forward rule use — no m²×m² Kronecker materialised.
     if !(typeof(B) <: Const)
         XK = Matrix{T}(undef, n, m * m)
         T1 = Array{T}(undef, n, m, m)
@@ -195,8 +191,15 @@ function EnzymeRules.reverse(
         LinearAlgebra.mul!(B.dval, Λ, transpose(XK), -one(T), one(T))
     end
 
-    # C̄ via K̄ = −R where R = X' · B' · Λ (m² × m²), then two index sums
-    # (one per Kronecker leg).
+    # Docs § Enzyme VJP, Step 3: pullback through the Kronecker leg
+    #   K̄ = − R    with R := X' · B' · Λ ∈ ℝ^{m² × m²},
+    # then the column-major Kronecker convention
+    #   (C ⊗ C)_{(i-1)m+k, (j-1)m+l} = C_{i,j} · C_{k,l}
+    # gives, after applying d(C ⊗ C) = (dC ⊗ C) + (C ⊗ dC) and pairing,
+    #   C̄_{i,j} = Σ_{k,l} K̄_{(i-1)m+k, (j-1)m+l} · C_{k,l}
+    #           + Σ_{k,l} K̄_{(k-1)m+i, (l-1)m+j} · C_{k,l}.
+    # We accumulate `−Σ_{k,l} R_{…} · C_{k,l}` directly into C̄, absorbing
+    # the minus sign from `K̄ = −R`.
     if !(typeof(C) <: Const)
         BΛ = Matrix{T}(undef, n, m * m)
         LinearAlgebra.mul!(BΛ, transpose(Bval), Λ)
@@ -205,8 +208,8 @@ function EnzymeRules.reverse(
         @inbounds for j in 1:m, i in 1:m
             s = zero(T)
             for l in 1:m, k in 1:m
-                s += R[(i - 1) * m + k, (j - 1) * m + l] * Cval[k, l]
-                s += R[(k - 1) * m + i, (l - 1) * m + j] * Cval[k, l]
+                s += R[(i - 1) * m + k, (j - 1) * m + l] * Cval[k, l]   # leg 1
+                s += R[(k - 1) * m + i, (l - 1) * m + j] * Cval[k, l]   # leg 2
             end
             C.dval[i, j] -= s
         end
@@ -216,18 +219,12 @@ function EnzymeRules.reverse(
     return (nothing, nothing, nothing, nothing)
 end
 
-# ─── In-place form: gsylv_kamenik!(D, A, B, C) ───────────────────────────────
+# In-place form: gsylv_kamenik!(D, A, B, C).
 #
-# `gsylv_kamenik!(D, A, B, C)` overwrites `D` with the solution `X`. Enzyme
-# sees `D` as a single Annotation that's both RHS-in and solution-out. The
-# `Duplicated(D, D̄)` slot accordingly carries `X̄` on entry to the reverse
-# pass (cotangent of the post-call value, i.e. the solution); the rule
-# writes `Λ` back into the same slot (cotangent of the pre-call value, i.e.
-# the original RHS — `D̄ = Λ`).
-#
-# Forward mode: the `dval` slot starts holding the tangent of the input
-# buffer (dD) and the rule overwrites it with the tangent of the output
-# (dX), matching how Enzyme treats other mutating writes.
+# The `Duplicated(D, D̄)` slot is both RHS-in / solution-out for the
+# primal. Reverse: `D̄` enters as X̄ (cotangent of the post-call value)
+# and the rule overwrites it with Λ (cotangent of the pre-call value).
+# Forward: `D.dval` enters as dD and is overwritten with dX.
 
 function EnzymeRules.forward(
         config::EnzymeRules.FwdConfig,
@@ -241,18 +238,22 @@ function EnzymeRules.forward(
     n = size(A.val, 1)
     m = size(C.val, 1)
 
+    # Same JVP equation as the allocating form. Factor once, solve primal
+    # into D.val, then reuse the cache for each tangent.
     cache = MatrixEquationsAD._gsylv_kamenik_factor(A.val, B.val, C.val)
     MatrixEquationsAD._gsylv_kamenik_solve!(cache, D.val)
 
     typeof(D) <: Const && return nothing
 
     N = EnzymeRules.width(config)
-    X = D.val
+    X = D.val   # after solve!, D.val is the primal solution X.
 
     is_A_const = typeof(A) <: Const
     is_B_const = typeof(B) <: Const
     is_C_const = typeof(C) <: Const
 
+    # Same shared factors as the allocating forward rule — see comments
+    # there for the math (BX = B·X, XK = X·K via two-pass GEMM).
     BX = if !is_B_const || !is_C_const
         M = Matrix{T}(undef, n, m * m)
         LinearAlgebra.mul!(M, B.val, X)
@@ -269,39 +270,39 @@ function EnzymeRules.forward(
         copyto!(out, reshape(s2, n, m * m))
         out
     end
-    kron_buf = !is_C_const ? Matrix{T}(undef, n, m * m) : nothing
     s1 = !is_C_const ? Array{T}(undef, n, m, m) : nothing
     s2 = !is_C_const ? Array{T}(undef, n, m, m) : nothing
 
     for i in 1:N
-        # In-place RHS = upstream tangent of the input buffer (delivered
-        # in D.dval). We write the output tangent back into the same
-        # buffer; reads happen before writes inside this loop body.
+        # Build the JVP RHS in place on D.dval (entering as dD), then
+        # solve! overwrites with dX. Reads happen before writes so the
+        # rhs / output aliasing is safe.
         dX = N == 1 ? D.dval : D.dval[i]
-        # rhs starts as dD = dX (aliased); contributions are subtracted.
         if !is_A_const
+            # − dA · X
             dA = N == 1 ? A.dval : A.dval[i]
             LinearAlgebra.mul!(dX, dA, X, -one(T), one(T))
         end
         if !is_B_const
+            # − dB · (X · K) = − dB · XK
             dB = N == 1 ? B.dval : B.dval[i]
             LinearAlgebra.mul!(dX, dB, XK, -one(T), one(T))
         end
         if !is_C_const
+            # − BX · (dC ⊗ C + C ⊗ dC), as two two-pass GEMMs.
             dC = N == 1 ? C.dval : C.dval[i]
             LinearAlgebra.mul!(reshape(s1, n * m, m), reshape(BX, n * m, m), C.val)
             for l in 1:m
                 @views LinearAlgebra.mul!(s2[:, :, l], s1[:, :, l], dC)
             end
-            copyto!(kron_buf, reshape(s2, n, m * m))
-            dX .-= kron_buf
+            dX .-= reshape(s2, n, m * m)   # − BX · (C ⊗ dC)
             LinearAlgebra.mul!(reshape(s1, n * m, m), reshape(BX, n * m, m), dC)
             for l in 1:m
                 @views LinearAlgebra.mul!(s2[:, :, l], s1[:, :, l], C.val)
             end
-            copyto!(kron_buf, reshape(s2, n, m * m))
-            dX .-= kron_buf
+            dX .-= reshape(s2, n, m * m)   # − BX · (dC ⊗ C)
         end
+        # Solve the Kamenik system on the assembled RHS — in-place into dX.
         MatrixEquationsAD._gsylv_kamenik_solve!(cache, dX)
     end
     return nothing
@@ -342,9 +343,12 @@ function EnzymeRules.reverse(
     n = size(Aval, 1)
     m = size(Cval, 1)
 
-    # Adjoint Sylvester: same shape, transposed inputs. `gsylv_kamenik!`
-    # overwrites its first arg, so seed it with the upstream X̄ from
-    # D.dval; it returns Λ in that buffer.
+    # Docs § Enzyme VJP — same math as the allocating reverse rule, only
+    # the D̄ delivery differs.
+    #
+    # Step 1: adjoint Sylvester  A'·Λ + B'·Λ·(C' ⊗ C') = X̄.
+    # `gsylv_kamenik!` overwrites its first arg, so seed it with the
+    # upstream X̄ delivered in D.dval; it returns Λ in that same buffer.
     Λ = copy(D.dval)
     gsylv_kamenik!(
         Λ,
@@ -353,15 +357,17 @@ function EnzymeRules.reverse(
         Matrix(transpose(Cval))
     )
 
-    # D̄ = Λ — overwrite D.dval (consumes the upstream X̄; semantically
-    # the output-side cotangent is replaced by the input-side one for
-    # the mutated buffer).
+    # Step 2 (D̄ delivery, in-place variant): D̄ ← Λ. Because `gsylv_kamenik!`
+    # consumed the input buffer, the output-side cotangent X̄ is replaced
+    # by the input-side cotangent Λ on the same `D.dval` slot.
     copyto!(D.dval, Λ)
 
+    # Step 2 (Ā): Ā -= Λ · X'
     if !(typeof(A) <: Const)
         LinearAlgebra.mul!(A.dval, Λ, transpose(X), -one(T), one(T))
     end
 
+    # Step 2 (B̄): B̄ -= Λ · (X · K)' — X·K via the same two-pass GEMM.
     if !(typeof(B) <: Const)
         XK = Matrix{T}(undef, n, m * m)
         T1 = Array{T}(undef, n, m, m)
@@ -373,6 +379,8 @@ function EnzymeRules.reverse(
         LinearAlgebra.mul!(B.dval, Λ, transpose(XK), -one(T), one(T))
     end
 
+    # Step 3 (C̄): K̄ = −R with R = X' · B' · Λ; sum the two Kronecker legs
+    # (same formula as the allocating reverse rule above).
     if !(typeof(C) <: Const)
         BΛ = Matrix{T}(undef, n, m * m)
         LinearAlgebra.mul!(BΛ, transpose(Bval), Λ)
@@ -381,8 +389,8 @@ function EnzymeRules.reverse(
         @inbounds for j in 1:m, i in 1:m
             s = zero(T)
             for l in 1:m, k in 1:m
-                s += R[(i - 1) * m + k, (j - 1) * m + l] * Cval[k, l]
-                s += R[(k - 1) * m + i, (l - 1) * m + j] * Cval[k, l]
+                s += R[(i - 1) * m + k, (j - 1) * m + l] * Cval[k, l]   # leg 1
+                s += R[(k - 1) * m + i, (l - 1) * m + j] * Cval[k, l]   # leg 2
             end
             C.dval[i, j] -= s
         end

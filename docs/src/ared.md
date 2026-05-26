@@ -349,7 +349,7 @@ P, K = muth_filter(ρ_baseline, σ_ν, σ_ω, σ_v)
 P, K
 ```
 
-The first column of `K` is the gain on the *permanent* component
+The first component of `K` is the gain on the *permanent* component
 ``\hat\mu_{t|t}``; the second is the gain on the *transitory*
 component ``\hat\varepsilon_{t|t}``. Their ratio is informative: when
 ``K_\mu / K_\varepsilon`` is large the filter attributes new

@@ -46,10 +46,14 @@ when the corresponding AD package is in scope:
 | `MatrixEquationsADForwardDiffExt` | `using ForwardDiff` |
 | `MatrixEquationsADEnzymeExt` | `using Enzyme` |
 | `MatrixEquationsADStaticArraysExt` | `using StaticArrays` |
+| `MatrixEquationsADForwardDiffStaticArraysExt` | `using ForwardDiff, StaticArrays` |
+| `MatrixEquationsADEnzymeStaticArraysExt` | `using Enzyme, StaticArrays` |
 
 The StaticArrays extension supplies `SMatrix` dispatches for `klein_map`
 (requires explicit `Val(n_x)` for type-stable output sizing) and
-`lyapdkr`.
+`lyapdkr`. The two triple extensions activate the native-`SMatrix` AD
+rule paths for `lyapdkr` once both `ForwardDiff` / `Enzyme` and
+`StaticArrays` are loaded.
 
 ## Conventions
 
