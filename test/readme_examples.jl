@@ -5,6 +5,9 @@ using MatrixEquations
 using MatrixEquationsAD
 using Test
 
+# Test tier flag — see test/runtests.jl.
+const _RUN_SLOW_TESTS = get(ENV, "RUN_SLOW_TESTS", "false") == "true"
+
 function readme_gsylv_weighted_sum(A, B, C, D, E, W)
     return dot(W, gsylv(A, B, C, D, E))
 end
@@ -27,35 +30,39 @@ end
         @test all(isfinite, grad)
     end
 
-    @testset "Enzyme reverse gsylv" begin
-        A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
-        B = [3.0 0.2; -0.1 2.7]
-        C = [0.2 0.0 0.0; 0.0 0.2 0.0; 0.0 0.0 0.2]
-        D = [0.3 0.0; 0.0 0.3]
-        E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
-        W = [0.7 -0.1; -0.2 0.4; 0.5 0.3]
+    if _RUN_SLOW_TESTS
+        # Enzyme rule for `gsylv` is a non-production wrapper (not exported);
+        # compilation costs ~55s. Gated to the slow tier.
+        @testset "Enzyme reverse gsylv" begin
+            A = [4.0 0.1 0.0; -0.2 3.6 0.3; 0.1 0.0 3.8]
+            B = [3.0 0.2; -0.1 2.7]
+            C = [0.2 0.0 0.0; 0.0 0.2 0.0; 0.0 0.0 0.2]
+            D = [0.3 0.0; 0.0 0.3]
+            E = [1.0 -0.4; 0.3 0.8; -0.2 0.5]
+            W = [0.7 -0.1; -0.2 0.4; 0.5 0.3]
 
-        dA = make_zero(A)
-        dB = make_zero(B)
-        dC = make_zero(C)
-        dD = make_zero(D)
-        dE = make_zero(E)
+            dA = make_zero(A)
+            dB = make_zero(B)
+            dC = make_zero(C)
+            dD = make_zero(D)
+            dE = make_zero(E)
 
-        autodiff(
-            Reverse, readme_gsylv_weighted_sum, Active,
-            Duplicated(A, dA),
-            Duplicated(B, dB),
-            Duplicated(C, dC),
-            Duplicated(D, dD),
-            Duplicated(E, dE),
-            Const(W),
-        )
+            autodiff(
+                Reverse, readme_gsylv_weighted_sum, Active,
+                Duplicated(A, dA),
+                Duplicated(B, dB),
+                Duplicated(C, dC),
+                Duplicated(D, dD),
+                Duplicated(E, dE),
+                Const(W),
+            )
 
-        @test any(!iszero, dA)
-        @test any(!iszero, dB)
-        @test any(!iszero, dC)
-        @test any(!iszero, dD)
-        @test any(!iszero, dE)
+            @test any(!iszero, dA)
+            @test any(!iszero, dB)
+            @test any(!iszero, dC)
+            @test any(!iszero, dD)
+            @test any(!iszero, dE)
+        end
     end
 
     @testset "klein_map" begin

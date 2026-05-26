@@ -27,6 +27,9 @@ include(joinpath(@__DIR__, "example_matrices", "sgu.jl"))
 include(joinpath(@__DIR__, "example_matrices", "fvgq.jl"))
 include(joinpath(@__DIR__, "example_matrices", "sw07.jl"))
 
+# Test tier flag — see test/runtests.jl.
+const _RUN_SLOW_TESTS = get(ENV, "RUN_SLOW_TESTS", "false") == "true"
+
 # Scalar-loss wrappers reused across the AD lanes (Enzyme reverse on a
 # matrix-valued output isn't well-defined; test_reverse here takes a
 # weighted scalar functional).
@@ -102,6 +105,9 @@ end
 # Random-matrix Enzyme-rule sanity at n = 3 (the multi-pencil AD lanes
 # below are the more thorough coverage gate; this one keeps the small
 # test_forward / test_reverse signal in case fixture sizes change).
+# ~1m30s of Enzyme compilation — gated to the slow tier; the default-tier
+# anchor for `lyapd!` reverse lives in test_enzyme_dlyap.jl.
+if _RUN_SLOW_TESTS
 @testset "lyapd! Enzyme rules (random n=3)" begin
     rng = MersenneTwister(13)
     n = 3
@@ -132,6 +138,7 @@ end
         (W, Const),
     )
 end
+end  # if _RUN_SLOW_TESTS
 
 @testset "lyapd! ForwardDiff Dual chunk (random n=4)" begin
     rng = MersenneTwister(17)
@@ -178,6 +185,8 @@ end
 # backends (FD chunked `Dual`, Enzyme forward, Enzyme reverse) hit the
 # same pencil. `max_range = 1.0e-5` keeps the FD perturbation small
 # enough to stay inside the Schur-stability ball even at n = 7.
+# ~1m EnzymeTestUtils compilation across 3 fixtures × 3 sweeps — gated.
+if _RUN_SLOW_TESTS
 @testset "lyapd / lyapd! AD coverage — fixtures" begin
     rng_seeds = Dict(
         "rbc" => 1001,
@@ -273,3 +282,4 @@ end
         end
     end
 end
+end  # if _RUN_SLOW_TESTS
